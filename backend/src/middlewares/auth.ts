@@ -7,7 +7,7 @@ export const authenticate = (
   next: NextFunction,
 ): void => {
   try {
-    const token = req.cookies?.__session;
+    const token = req.cookies?.refreshToken;
     console.log(token);
     console.log(req.cookies)
     if (!token) {
