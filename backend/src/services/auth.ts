@@ -46,6 +46,7 @@ export const issueWsToken = ({ userId, email }: AuthTokenPayload): string => {
 };
 
 export const verifyAuthToken = (token: string): AuthTokenPayload => {
+  console.log("Verifying token:", token, " JWT_SECRET:", ENV.JWT_SECRET);
   const payload = jwt.verify(token, ENV.JWT_SECRET!, {
     issuer: "aurax",
   });
