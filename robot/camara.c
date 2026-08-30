@@ -20,10 +20,10 @@ const char* WIFI_PASSWORD =
 // =====================================================
 
 const char* WS_HOST =
-    "2c1d-2409-40f2-101f-d188-5663-b267-fe5b-3dd6.ngrok-free.app";
+    "3.6.221.61";
 
 const uint16_t WS_PORT =
-    443;
+    5000;
 
 const char* WS_PATH =
     "/ws";
@@ -657,7 +657,7 @@ void webSocketEvent(
 
 
         Serial.print(
-            "[WS] URL: wss://"
+            "[WS] URL: ws://"
         );
 
         Serial.print(
@@ -1010,7 +1010,7 @@ void setupWebSocket()
     Serial.println();
 
     Serial.println(
-        "[WS] Initializing WSS..."
+        "[WS] Initializing WS..."
     );
 
 
@@ -1042,10 +1042,10 @@ void setupWebSocket()
 
 
     // =================================================
-    // WSS
+    // WS
     // =================================================
 
-    webSocket.beginSSL(
+    webSocket.begin(
         WS_HOST,
         WS_PORT,
         WS_PATH
@@ -1058,16 +1058,6 @@ void setupWebSocket()
 
     webSocket.onEvent(
         webSocketEvent
-    );
-
-
-    // ngrok free tier shows a browser warning page for new HTTP connections.
-    // This header tells ngrok to skip the interstitial and pass the WS upgrade
-    // directly to the backend — without it the handshake returns HTML and
-    // the ESP32 disconnects immediately.
-
-    webSocket.setExtraHeaders(
-        "ngrok-skip-browser-warning: true"
     );
 
 
@@ -1085,7 +1075,6 @@ void setupWebSocket()
     // =================================================
 
     // Ping every 25s, pong timeout 10s, allow 3 missed pongs.
-    // Generous values to tolerate ngrok tunnel latency.
 
     webSocket.enableHeartbeat(
         25000,
@@ -1095,7 +1084,7 @@ void setupWebSocket()
 
 
     Serial.println(
-        "[WS] WSS initialized"
+        "[WS] WS initialized"
     );
 }
 

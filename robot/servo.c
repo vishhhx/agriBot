@@ -15,8 +15,8 @@ const char* WIFI_PASSWORD = "gangu123";
 // WEBSOCKET SERVER CONFIGURATION
 // =====================================================
 
-const char* WS_HOST       = "2c1d-2409-40f2-101f-d188-5663-b267-fe5b-3dd6.ngrok-free.app";
-const uint16_t WS_PORT    = 443;
+const char* WS_HOST       = "3.6.221.61";
+const uint16_t WS_PORT    = 5000;
 const char* WS_PATH       = "/ws";
 
 // =====================================================
@@ -431,7 +431,7 @@ void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
     case WStype_CONNECTED:
       Serial.println();
       Serial.println("========================================");
-      Serial.println("[WS] WSS CONNECTED (SERVO Module)");
+      Serial.println("[WS] WS CONNECTED (SERVO Module)");
       Serial.println("========================================");
 
       wsConnected = true;
@@ -441,7 +441,7 @@ void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
 
     case WStype_DISCONNECTED:
       Serial.println();
-      Serial.println("[WS] WSS DISCONNECTED");
+      Serial.println("[WS] WS DISCONNECTED");
       wsConnected = false;
       robotRegistered = false;
       sprayOff();
@@ -515,7 +515,7 @@ void setupPCA9685() {
 void setupWebSocket() {
   Serial.println();
   Serial.println("========================================");
-  Serial.println("[WS] Initializing WSS...");
+  Serial.println("[WS] Initializing WS...");
   Serial.print("[WS] Host: ");
   Serial.println(WS_HOST);
   Serial.print("[WS] Port: ");
@@ -523,23 +523,15 @@ void setupWebSocket() {
   Serial.print("[WS] Path: ");
   Serial.println(WS_PATH);
 
-  // beginSSL without a fingerprint skips cert validation (fine for ngrok)
-  webSocket.beginSSL(WS_HOST, WS_PORT, WS_PATH);
+  webSocket.begin(WS_HOST, WS_PORT, WS_PATH);
   webSocket.onEvent(webSocketEvent);
-
-  // ngrok free tier shows a browser warning page for new HTTP connections.
-  // This header tells ngrok to skip the interstitial and pass the WS upgrade
-  // directly to the backend — without it the handshake returns HTML and
-  // the ESP32 disconnects immediately.
-  webSocket.setExtraHeaders("ngrok-skip-browser-warning: true");
 
   webSocket.setReconnectInterval(3000);
 
   // Heartbeat: ping every 25s, pong timeout 10s, allow 3 missed pongs
-  // Generous values to tolerate ngrok's variable tunnel latency
   webSocket.enableHeartbeat(25000, 10000, 3);
 
-  Serial.println("[WS] WSS initialized");
+  Serial.println("[WS] WS initialized");
   Serial.println("========================================");
 }
 

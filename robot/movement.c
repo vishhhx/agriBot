@@ -19,9 +19,9 @@ const char* WIFI_PASSWORD = "gangu123";
 // =====================================================
 
 const char* WS_HOST =
-    "296c-2409-40f2-8-b98f-c000-af5c-deb7-5f52.ngrok-free.app";
+    "3.6.221.61";
 
-const uint16_t WS_PORT = 443;
+const uint16_t WS_PORT = 5000;
 
 const char* WS_PATH = "/ws";
 
@@ -1387,7 +1387,7 @@ void webSocketEvent(
             );
 
             Serial.println(
-                "[WS] WSS CONNECTED"
+                "[WS] WS CONNECTED"
             );
 
             Serial.println(
@@ -1412,7 +1412,7 @@ void webSocketEvent(
         case WStype_DISCONNECTED:
 
             Serial.println(
-                "[WS] WSS DISCONNECTED"
+                "[WS] WS DISCONNECTED"
             );
 
 
@@ -1707,11 +1707,11 @@ void connectWiFi() {
 void setupWebSocket() {
 
     Serial.println(
-        "[WS] Starting WSS..."
+        "[WS] Starting WS..."
     );
 
 
-    webSocket.beginSSL(
+    webSocket.begin(
         WS_HOST,
         WS_PORT,
         WS_PATH
@@ -1720,11 +1720,6 @@ void setupWebSocket() {
 
     webSocket.onEvent(
         webSocketEvent
-    );
-
-
-    webSocket.setExtraHeaders(
-        "ngrok-skip-browser-warning: true"
     );
 
 
@@ -1741,7 +1736,7 @@ void setupWebSocket() {
 
 
     Serial.println(
-        "[WS] WSS client started"
+        "[WS] WS client started"
     );
 }
 

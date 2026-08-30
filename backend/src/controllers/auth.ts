@@ -20,7 +20,7 @@ const redirectToLoginWithError = (res: Response, message: string): void => {
 const cookieOptions = {
   httpOnly: true,
   sameSite: "lax" as const,
-  secure: process.env.NODE_ENV === "production",
+  secure: process.env.COOKIE_SECURE === "true",
   path: "/",
 };
 
@@ -68,14 +68,15 @@ export const googleOAuthCallback = async (
 
     const savedState = req.cookies?.[oauthStateCookie];
 
-    res.clearCookie(oauthStateCookie, cookieOptions);
-
     if (!code || !state || !savedState || state !== savedState) {
+      res.clearCookie(oauthStateCookie, cookieOptions);
       return redirectToLoginWithError(
         res,
         "Google sign-in request is invalid or expired.",
       );
     }
+
+    res.clearCookie(oauthStateCookie, cookieOptions);
 
     const googleAuthService = new GoogleAuthService();
 

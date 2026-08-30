@@ -12,23 +12,17 @@ const char* WIFI_PASSWORD = "gangu123";
 // =====================================================
 // WEBSOCKET SERVER
 // =====================================================
-//
-// Backend:
-// http://localhost:5000
-//
-// Ngrok tunnel:
-// https://296c-2409-40f2-8-b98f-c000-af5c-deb7-5f52.ngrok-free.app
+// Backend EC2 Server:
+// http://3.6.221.61:5000
 //
 // WebSocket:
-// wss://296c-2409-40f2-8-b98f-c000-af5c-deb7-5f52.ngrok-free.app/ws
+// ws://3.6.221.61:5000/ws
 //
 
 const char* WS_HOST =
-    "296c-2409-40f2-8-b98f-c000-af5c-deb7-5f52.ngrok-free.app";
+    "3.6.221.61";
 
-
-  
-const uint16_t WS_PORT = 443;
+const uint16_t WS_PORT = 5000;
 
 const char* WS_PATH = "/ws";
 
@@ -881,7 +875,7 @@ void webSocketEvent(
       );
 
       Serial.println(
-        "[WS] WSS CONNECTED - WATER MODULE"
+        "[WS] WS CONNECTED - WATER MODULE"
       );
 
       Serial.println(
@@ -999,7 +993,7 @@ void setupWebSocket() {
     "[WS] Initializing..."
   );
 
-  webSocket.beginSSL(
+  webSocket.begin(
     WS_HOST,
     WS_PORT,
     WS_PATH
@@ -1007,10 +1001,6 @@ void setupWebSocket() {
 
   webSocket.onEvent(
     webSocketEvent
-  );
-
-  webSocket.setExtraHeaders(
-    "ngrok-skip-browser-warning: true"
   );
 
   webSocket.setReconnectInterval(
