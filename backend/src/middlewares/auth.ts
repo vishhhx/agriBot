@@ -7,10 +7,18 @@ export const authenticate = (
   next: NextFunction,
 ): void => {
   try {
-    const token =
-      req.cookies?.__session ||
-      req.cookies?.refreshToken ||
-      req.headers.authorization?.replace(/^Bearer\s+/i, "");
+    const cookieToken = req.cookies?.__session;
+    const headerToken = req.headers.authorization?.replace(/^Bearer\s+/i, "");
+
+    console.log("Cookie token exists:", !!cookieToken);
+    console.log("Header token exists:", !!headerToken);
+
+    console.log("Cookie token prefix:", cookieToken?.substring(0, 30));
+
+    console.log("Header token prefix:", headerToken?.substring(0, 30));
+
+    const token = cookieToken || headerToken;
+
     if (!token) {
       res.status(401).json({
         success: false,
@@ -18,6 +26,8 @@ export const authenticate = (
       });
       return;
     }
+
+    console.log("USING TOKEN:", token === cookieToken ? "COOKIE" : "HEADER");
 
     const payload = verifyAuthToken(token);
 
