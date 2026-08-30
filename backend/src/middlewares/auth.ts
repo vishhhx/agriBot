@@ -8,7 +8,7 @@ export const authenticate = (
 ): void => {
   try {
     const token = req.cookies?.__session;
-
+      console.log(token);
     if (!token) {
       res.status(401).json({
         success: false,
