@@ -7,9 +7,10 @@ export const authenticate = (
   next: NextFunction,
 ): void => {
   try {
-    const token = req.cookies?.refreshToken;
-    console.log(token);
-    console.log(req.cookies)
+    const token =
+      req.cookies?.__session ||
+      req.cookies?.refreshToken ||
+      req.headers.authorization?.replace(/^Bearer\s+/i, "");
     if (!token) {
       res.status(401).json({
         success: false,
