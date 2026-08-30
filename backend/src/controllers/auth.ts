@@ -20,7 +20,7 @@ const redirectToLoginWithError = (res: Response, message: string): void => {
 const cookieOptions = {
   httpOnly: true,
   sameSite: "lax" as const,
-  secure: process.env.COOKIE_SECURE === "true",
+  secure: ENV.COOKIE_SECURE,
   path: "/",
 };
 
