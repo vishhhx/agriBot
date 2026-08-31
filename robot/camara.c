@@ -20,10 +20,10 @@ const char* WIFI_PASSWORD =
 // =====================================================
 
 const char* WS_HOST =
-    "3.6.221.61";
+    "rf3pnggh-5000.inc1.devtunnels.ms";
 
 const uint16_t WS_PORT =
-    5000;
+    443;
 
 const char* WS_PATH =
     "/ws";
@@ -1045,11 +1045,19 @@ void setupWebSocket()
     // WS
     // =================================================
 
-    webSocket.begin(
-        WS_HOST,
-        WS_PORT,
-        WS_PATH
-    );
+    if (WS_PORT == 443) {
+        webSocket.beginSSL(
+            WS_HOST,
+            WS_PORT,
+            WS_PATH
+        );
+    } else {
+        webSocket.begin(
+            WS_HOST,
+            WS_PORT,
+            WS_PATH
+        );
+    }
 
 
     // =================================================

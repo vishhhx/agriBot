@@ -21,22 +21,26 @@ interface WaterPumpControllerProps {
   sprayOn: boolean;
   tankFull: boolean;
   waterDistanceCm: number | null;
+  waterPercent?: number | null;
+  sensorPresent?: boolean;
   onRefill: (state: WaterPumpState) => void;
   onSpray: (state: WaterPumpState) => void;
 }
 
 // =====================================================
 // TANK LEVEL ARC
-// Tank sensor sits at the top; closer distance = fuller.
+// Tank sensor sits at top; closer distance = fuller.
 // TANK_FULL_DISTANCE_CM = 5.08 (2 inches)
-// We show 0% when no reading, 100% when ≤ 5.08 cm.
 // Reasonable "empty" ceiling is 40 cm.
 // =====================================================
 
 const FULL_CM  = 5.08;
 const EMPTY_CM = 40;
 
-function distanceToPercent(cm: number | null): number {
+function distanceToPercent(cm: number | null, givenPercent?: number | null): number {
+  if (givenPercent !== undefined && givenPercent !== null && givenPercent >= 0) {
+    return Math.min(Math.max(givenPercent, 0), 100);
+  }
   if (cm === null || cm < 0) return 0;
   if (cm <= FULL_CM) return 100;
   if (cm >= EMPTY_CM) return 0;
@@ -134,12 +138,15 @@ export function WaterPumpController({
   sprayOn,
   tankFull,
   waterDistanceCm,
+  waterPercent,
+  sensorPresent = true,
   onRefill,
   onSpray,
 }: WaterPumpControllerProps) {
-  const tankPercent = distanceToPercent(waterDistanceCm);
+  const isSensorActive = sensorPresent && waterDistanceCm !== null && waterDistanceCm >= 0;
+  const tankPercent = isSensorActive ? distanceToPercent(waterDistanceCm, waterPercent) : 0;
 
-  const refillDisabled = disabled || !connected || (tankFull && !refillOn);
+  const refillDisabled = disabled || !connected || (isSensorActive && tankFull && !refillOn);
 
   return (
     <div
@@ -172,28 +179,37 @@ export function WaterPumpController({
       {/* ------------------------------------------------ Tank level */}
       <div className="flex items-center gap-4">
         <div className="h-20 w-20 shrink-0">
-          <TankArc percent={tankPercent} tankFull={tankFull} />
+          <TankArc percent={isSensorActive ? tankPercent : 0} tankFull={isSensorActive && tankFull} />
         </div>
 
         <div className="flex flex-col gap-1.5 text-xs">
           <div className="flex items-center gap-1.5">
-            {tankFull ? (
+            {!isSensorActive ? (
+              <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[9px] font-bold text-slate-400">
+                Sensor N/A (Manual Mode)
+              </span>
+            ) : tankFull ? (
               <CheckCircle2 size={12} className="text-cyan-400" aria-hidden />
             ) : (
               <AlertTriangle size={12} className={tankPercent < 20 ? "text-red-400" : "text-yellow-400"} aria-hidden />
             )}
-            <span className={`font-semibold ${tankFull ? "text-cyan-300" : "text-slate-300"}`}>
-              {tankFull ? "Tank Full" : "Tank Level"}
+            <span className={`font-semibold ${isSensorActive && tankFull ? "text-cyan-300" : "text-slate-300"}`}>
+              {!isSensorActive ? "Tank Status" : tankFull ? "Tank Full (<= 2 in)" : "Tank Level"}
             </span>
           </div>
 
-          {waterDistanceCm !== null && waterDistanceCm >= 0 ? (
-            <span className="font-mono text-[10px] text-slate-400">
-              {waterDistanceCm.toFixed(1)} cm from sensor
-            </span>
+          {isSensorActive ? (
+            <div className="flex flex-col gap-0.5">
+              <span className="font-mono text-[10px] text-slate-300 font-bold">
+                {waterDistanceCm.toFixed(1)} cm / {(waterDistanceCm / 2.54).toFixed(1)} in depth
+              </span>
+              <span className="font-mono text-[9px] text-cyan-400/90">
+                {tankPercent}% Capacity Remaining
+              </span>
+            </div>
           ) : (
-            <span className="font-mono text-[10px] text-slate-600">
-              Sensor reading…
+            <span className="font-mono text-[10px] text-slate-500">
+              Ultrasonic sensor not detected — pumps enabled manually.
             </span>
           )}
 

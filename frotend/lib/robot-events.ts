@@ -17,7 +17,8 @@ export type WaterEventName =
   | "TANK_FULL"
   | "SPRAY_STARTED"
   | "SPRAY_STOPPED"
-  | "ALL_PUMPS_STOPPED";
+  | "ALL_PUMPS_STOPPED"
+  | "SENSOR_DISCONNECTED";
 
 // =====================================================
 // CLIENT → BACKEND EVENTS
@@ -194,6 +195,8 @@ export type WaterEvent = {
   sprayPump: boolean;
   tankFull: boolean;
   waterDistanceCm: number;
+  waterPercent?: number;
+  sensorPresent?: boolean;
 };
 
 export type HornAcceptedEvent = {

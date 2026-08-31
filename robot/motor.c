@@ -12,17 +12,17 @@ const char* WIFI_PASSWORD = "gangu123";
 // =====================================================
 // WEBSOCKET SERVER
 // =====================================================
-// Backend EC2 Server:
-// http://3.6.221.61:5000
+// Backend Local Server:
+// http://localhost:5000
 //
 // WebSocket:
-// ws://3.6.221.61:5000/ws
+// ws://localhost:5000/ws
 //
 
 const char* WS_HOST =
-    "3.6.221.61";
+    "rf3pnggh-5000.inc1.devtunnels.ms";
 
-const uint16_t WS_PORT = 5000;
+const uint16_t WS_PORT = 443;
 
 const char* WS_PATH = "/ws";
 
@@ -75,27 +75,30 @@ bool robotRegistered = false;
 #define SPRAY_IN2 14
 
 // =====================================================
-// ULTRASONIC SENSOR  (DISABLED)
+// ULTRASONIC SENSOR & WATER LEVEL
 // =====================================================
 
-// #define ULTRASONIC_TRIG 32
-// #define ULTRASONIC_ECHO 33
+#define ULTRASONIC_TRIG 32
+#define ULTRASONIC_ECHO 33
 
-// Tank is considered FULL when water surface
-// is 2 inches or closer to the sensor
-// #define TANK_FULL_DISTANCE_CM 5.08
+// Tank is considered FULL when water surface is 2 inches (5.08 cm) or closer
+#define TANK_FULL_DISTANCE_CM 5.08
+#define TANK_EMPTY_DISTANCE_CM 40.0
 
 // =====================================================
-// PUMP STATES
+// PUMP & WATER STATES
 // =====================================================
 
 bool refillPumpState = false;
 bool sprayPumpState = false;
 
-// bool tankFull = false;  // disabled — no ultrasonic
+bool sensorPresent = false;
+bool tankFull = false;
+float currentWaterDistance = -1.0;
+int currentWaterPercent = 0;
 
-// unsigned long lastUltrasonicCheck = 0;       // disabled
-// const unsigned long ULTRASONIC_INTERVAL = 300; // disabled
+unsigned long lastUltrasonicCheck = 0;
+const unsigned long ULTRASONIC_INTERVAL = 300;
 
 // =====================================================
 // FUNCTION DECLARATIONS
@@ -103,7 +106,7 @@ bool sprayPumpState = false;
 
 void connectWiFi();
 void setupMotors();
-// void setupUltrasonic();  // disabled
+void setupUltrasonic();
 void setupWebSocket();
 
 void sendRegistration();
@@ -118,8 +121,8 @@ void sprayPumpOff();
 
 void stopAllPumps();
 
-// float getWaterDistance();  // disabled
-// void checkWaterLevel();    // disabled
+float getWaterDistance();
+void checkWaterLevel();
 
 void handleServerMessage(JsonDocument& doc);
 
@@ -218,99 +221,68 @@ void setupMotors() {
 }
 
 // =====================================================
-// ULTRASONIC SETUP  (DISABLED)
+// ULTRASONIC SETUP & DISTANCE MEASUREMENT
 // =====================================================
 
-// void setupUltrasonic() {
-//   pinMode(ULTRASONIC_TRIG, OUTPUT);
-//   pinMode(ULTRASONIC_ECHO, INPUT);
-//   digitalWrite(ULTRASONIC_TRIG, LOW);
-//   Serial.println("[ULTRASONIC] Sensor Ready");
-// }
+void setupUltrasonic() {
+  pinMode(ULTRASONIC_TRIG, OUTPUT);
+  pinMode(ULTRASONIC_ECHO, INPUT);
+  digitalWrite(ULTRASONIC_TRIG, LOW);
+  Serial.println("[ULTRASONIC] Sensor Initialized (Trig=32, Echo=33)");
+}
 
-// =====================================================
-// GET WATER DISTANCE  (DISABLED)
-// =====================================================
+float getWaterDistance() {
+  digitalWrite(ULTRASONIC_TRIG, LOW);
+  delayMicroseconds(2);
+  digitalWrite(ULTRASONIC_TRIG, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(ULTRASONIC_TRIG, LOW);
 
-// float getWaterDistance() {
-//   digitalWrite(ULTRASONIC_TRIG, LOW);
-//   delayMicroseconds(2);
-//   digitalWrite(ULTRASONIC_TRIG, HIGH);
-//   delayMicroseconds(10);
-//   digitalWrite(ULTRASONIC_TRIG, LOW);
-//   long duration = pulseIn(ULTRASONIC_ECHO, HIGH, 30000);
-//   if (duration == 0) { return -1; }
-//   float distance = duration * 0.0343 / 2;
-//   return distance;
-// }
+  long duration = pulseIn(ULTRASONIC_ECHO, HIGH, 30000); // 30ms timeout (~5m max)
+  if (duration == 0) {
+    return -1.0; // Sensor not connected or timed out
+  }
+
+  float distance = duration * 0.0343 / 2.0;
+  if (distance < 1.0 || distance > 400.0) {
+    return -1.0; // Invalid reading
+  }
+
+  return distance;
+}
 
 // =====================================================
 // REFILL PUMP
 // =====================================================
 
 void refillPumpOn() {
+  if (sensorPresent && tankFull) {
+    Serial.println("[REFILL BLOCKED] Tank is already full (Water within 2 inches)");
+    sendWaterEvent("TANK_FULL");
+    return;
+  }
 
-  // Ultrasonic tank-full check DISABLED — pump is fully manual.
-  // Uncomment the block below to re-enable auto-stop:
-  //
-  // float distance = getWaterDistance();
-  // if (distance > 0 && distance <= TANK_FULL_DISTANCE_CM) {
-  //   Serial.println("[REFILL] Tank already full");
-  //   tankFull = true;
-  //   refillPumpOff();
-  //   sendWaterEvent("TANK_FULL");
-  //   return;
-  // }
-
-  // Start Pump 1
-
-  digitalWrite(
-    REFILL_IN1,
-    HIGH
-  );
-
-  digitalWrite(
-    REFILL_IN2,
-    LOW
-  );
+  digitalWrite(REFILL_IN1, HIGH);
+  digitalWrite(REFILL_IN2, LOW);
 
   refillPumpState = true;
 
-  Serial.println(
-    "[REFILL] PUMP ON"
-  );
+  Serial.println("[REFILL] PUMP ON");
 
-  sendWaterEvent(
-    "REFILL_STARTED"
-  );
+  sendWaterEvent("REFILL_STARTED");
 }
 
 void refillPumpOff() {
+  digitalWrite(REFILL_IN1, LOW);
+  digitalWrite(REFILL_IN2, LOW);
 
-  digitalWrite(
-    REFILL_IN1,
-    LOW
-  );
-
-  digitalWrite(
-    REFILL_IN2,
-    LOW
-  );
-
-  bool wasRunning =
-    refillPumpState;
-
+  bool wasRunning = refillPumpState;
   refillPumpState = false;
 
-  Serial.println(
-    "[REFILL] PUMP OFF"
-  );
+  Serial.println("[REFILL] PUMP OFF");
 
   if (wasRunning) {
-
-    sendWaterEvent(
-      "REFILL_STOPPED"
-    );
+    sendWaterEvent("REFILL_STOPPED");
   }
 }
 
@@ -319,54 +291,27 @@ void refillPumpOff() {
 // =====================================================
 
 void sprayPumpOn() {
-
-  digitalWrite(
-    SPRAY_IN1,
-    HIGH
-  );
-
-  digitalWrite(
-    SPRAY_IN2,
-    LOW
-  );
+  digitalWrite(SPRAY_IN1, HIGH);
+  digitalWrite(SPRAY_IN2, LOW);
 
   sprayPumpState = true;
 
-  Serial.println(
-    "[SPRAY] PUMP ON"
-  );
+  Serial.println("[SPRAY] PUMP ON");
 
-  sendWaterEvent(
-    "SPRAY_STARTED"
-  );
+  sendWaterEvent("SPRAY_STARTED");
 }
 
 void sprayPumpOff() {
+  digitalWrite(SPRAY_IN1, LOW);
+  digitalWrite(SPRAY_IN2, LOW);
 
-  digitalWrite(
-    SPRAY_IN1,
-    LOW
-  );
-
-  digitalWrite(
-    SPRAY_IN2,
-    LOW
-  );
-
-  bool wasRunning =
-    sprayPumpState;
-
+  bool wasRunning = sprayPumpState;
   sprayPumpState = false;
 
-  Serial.println(
-    "[SPRAY] PUMP OFF"
-  );
+  Serial.println("[SPRAY] PUMP OFF");
 
   if (wasRunning) {
-
-    sendWaterEvent(
-      "SPRAY_STOPPED"
-    );
+    sendWaterEvent("SPRAY_STOPPED");
   }
 }
 
@@ -375,66 +320,77 @@ void sprayPumpOff() {
 // =====================================================
 
 void stopAllPumps() {
+  digitalWrite(REFILL_IN1, LOW);
+  digitalWrite(REFILL_IN2, LOW);
 
-  digitalWrite(
-    REFILL_IN1,
-    LOW
-  );
-
-  digitalWrite(
-    REFILL_IN2,
-    LOW
-  );
-
-  digitalWrite(
-    SPRAY_IN1,
-    LOW
-  );
-
-  digitalWrite(
-    SPRAY_IN2,
-    LOW
-  );
+  digitalWrite(SPRAY_IN1, LOW);
+  digitalWrite(SPRAY_IN2, LOW);
 
   refillPumpState = false;
-
   sprayPumpState = false;
 
-  Serial.println(
-    "[MOTOR] ALL PUMPS STOPPED"
-  );
+  Serial.println("[MOTOR] ALL PUMPS STOPPED");
 }
 
 // =====================================================
-// WATER LEVEL MONITOR  (DISABLED)
+// WATER LEVEL MONITOR (ULTRASONIC REACTIVE AUTO-STOP)
 // =====================================================
 
-// Ultrasonic auto-stop is disabled.
-// Re-enable by uncommenting this function and the
-// checkWaterLevel() call in loop().
-//
-// void checkWaterLevel() {
-//   if (millis() - lastUltrasonicCheck < ULTRASONIC_INTERVAL) return;
-//   lastUltrasonicCheck = millis();
-//   float distance = getWaterDistance();
-//   if (distance < 0) return;
-//   Serial.print("[WATER LEVEL] Distance: ");
-//   Serial.print(distance);
-//   Serial.println(" cm");
-//   if (distance <= TANK_FULL_DISTANCE_CM) {
-//     if (!tankFull) {
-//       tankFull = true;
-//       Serial.println("[TANK] FULL");
-//       sendWaterEvent("TANK_FULL");
-//     }
-//     if (refillPumpState) {
-//       refillPumpOff();
-//       sendWaterEvent("REFILL_AUTO_STOPPED");
-//     }
-//   } else {
-//     tankFull = false;
-//   }
-// }
+void checkWaterLevel() {
+  if (millis() - lastUltrasonicCheck < ULTRASONIC_INTERVAL) return;
+  lastUltrasonicCheck = millis();
+
+  float distance = getWaterDistance();
+
+  if (distance < 0) {
+    if (sensorPresent) {
+      sensorPresent = false;
+      tankFull = false;
+      currentWaterDistance = -1.0;
+      currentWaterPercent = 0;
+      Serial.println("[ULTRASONIC] Sensor missing / not detected - Sensor features disabled");
+      sendWaterEvent("SENSOR_DISCONNECTED");
+    }
+    return;
+  }
+
+  // Sensor is present and returning valid readings
+  if (!sensorPresent) {
+    sensorPresent = true;
+    Serial.println("[ULTRASONIC] Sensor detected!");
+  }
+
+  currentWaterDistance = distance;
+
+  // Calculate percentage: 2 inches (5.08 cm) = 100%, 40 cm = 0%
+  if (distance <= TANK_FULL_DISTANCE_CM) {
+    currentWaterPercent = 100;
+  } else if (distance >= TANK_EMPTY_DISTANCE_CM) {
+    currentWaterPercent = 0;
+  } else {
+    currentWaterPercent = (int)(((TANK_EMPTY_DISTANCE_CM - distance) / (TANK_EMPTY_DISTANCE_CM - TANK_FULL_DISTANCE_CM)) * 100.0);
+  }
+
+  // Check 2-inch cutoff limit (5.08 cm)
+  if (distance <= TANK_FULL_DISTANCE_CM) {
+    if (!tankFull) {
+      tankFull = true;
+      Serial.print("[TANK FULL DETECTED] Water surface distance: ");
+      Serial.print(distance);
+      Serial.println(" cm (<= 2 inches)");
+      sendWaterEvent("TANK_FULL");
+    }
+
+    // Auto shut off refill motor when water reaches within 2 inches
+    if (refillPumpState) {
+      refillPumpOff();
+      Serial.println("[REFILL AUTO-STOP] Water reached 2-inch proximity safety threshold!");
+      sendWaterEvent("REFILL_AUTO_STOPPED");
+    }
+  } else {
+    tankFull = false;
+  }
+}
 
 // =====================================================
 // WEBSOCKET REGISTRATION
@@ -539,64 +495,33 @@ void sendStatus(
 // SEND WATER EVENT
 // =====================================================
 
-void sendWaterEvent(
-  const char* eventName
-) {
-
-  if (
-    !wsConnected ||
-    !robotRegistered
-  ) {
-
+void sendWaterEvent(const char* eventName) {
+  if (!wsConnected || !robotRegistered) {
     return;
   }
 
   JsonDocument doc;
 
-  doc["type"] =
-    "water:event";
-
-  doc["robotId"] =
-    ROBOT_ID;
-
-  doc["event"] =
-    eventName;
-
-  doc["refillPump"] =
-    refillPumpState;
-
-  doc["sprayPump"] =
-    sprayPumpState;
-
-  // Ultrasonic fields disabled — send safe defaults
-  doc["tankFull"] =
-    false;
-
-  doc["waterDistanceCm"] =
-    -1;
-
-  // float distance = getWaterDistance();  // disabled
-  // doc["tankFull"]        = tankFull;    // disabled
-  // doc["waterDistanceCm"] = distance;    // disabled
+  doc["type"] = "water:event";
+  doc["robotId"] = ROBOT_ID;
+  doc["event"] = eventName;
+  doc["refillPump"] = refillPumpState;
+  doc["sprayPump"] = sprayPumpState;
+  doc["tankFull"] = tankFull;
+  doc["waterDistanceCm"] = currentWaterDistance;
+  doc["waterPercent"] = currentWaterPercent;
+  doc["sensorPresent"] = sensorPresent;
 
   String message;
+  serializeJson(doc, message);
+  webSocket.sendTXT(message);
 
-  serializeJson(
-    doc,
-    message
-  );
-
-  webSocket.sendTXT(
-    message
-  );
-
-  Serial.print(
-    "[WATER EVENT SENT] "
-  );
-
-  Serial.println(
-    eventName
-  );
+  Serial.print("[WATER EVENT SENT] ");
+  Serial.print(eventName);
+  Serial.print(" | Dist=");
+  Serial.print(currentWaterDistance);
+  Serial.print("cm | Full=");
+  Serial.println(tankFull ? "YES" : "NO");
 }
 
 // =====================================================
@@ -993,11 +918,19 @@ void setupWebSocket() {
     "[WS] Initializing..."
   );
 
-  webSocket.begin(
-    WS_HOST,
-    WS_PORT,
-    WS_PATH
-  );
+  if (WS_PORT == 443) {
+    webSocket.beginSSL(
+      WS_HOST,
+      WS_PORT,
+      WS_PATH
+    );
+  } else {
+    webSocket.begin(
+      WS_HOST,
+      WS_PORT,
+      WS_PATH
+    );
+  }
 
   webSocket.onEvent(
     webSocketEvent
@@ -1047,7 +980,7 @@ void setup() {
 
   setupMotors();
 
-  // setupUltrasonic();  // disabled
+  setupUltrasonic();
 
   connectWiFi();
 
@@ -1062,7 +995,7 @@ void loop() {
 
   webSocket.loop();
 
-  // checkWaterLevel();  // disabled — ultrasonic sensor not in use
+  checkWaterLevel();
 
   // Reconnect WiFi if disconnected
 

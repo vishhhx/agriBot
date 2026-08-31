@@ -54,7 +54,7 @@ class RobotSocket {
     let wsUrl: string;
 
     const baseUrl = process.env.NEXT_PUBLIC_WS_URL
-      ?? "ws://3.6.221.61:5000";
+      ?? "ws://localhost:5000";
 
     try {
       const res = await fetch("/api/auth/ws-token", {

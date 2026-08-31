@@ -42,6 +42,8 @@ export function useRobotSocket(
   const [waterSprayOn, setWaterSprayOn] = useState(false);
   const [tankFull, setTankFull] = useState(false);
   const [waterDistanceCm, setWaterDistanceCm] = useState<number | null>(null);
+  const [waterPercent, setWaterPercent] = useState<number | null>(null);
+  const [sensorPresent, setSensorPresent] = useState<boolean>(true);
 
   const rolesKey = useMemo(() => roles.join("|"), [roles]);
 
@@ -136,12 +138,16 @@ export function useRobotSocket(
             setWaterSprayOn(event.sprayPump);
             setTankFull(event.tankFull);
             setWaterDistanceCm(event.waterDistanceCm);
+            if (event.waterPercent !== undefined) setWaterPercent(event.waterPercent);
+            if (event.sensorPresent !== undefined) setSensorPresent(event.sensorPresent);
             console.log(
               `[useRobotSocket] water:event event=${event.event}`,
               `refill=${event.refillPump}`,
               `spray=${event.sprayPump}`,
               `tankFull=${event.tankFull}`,
               `dist=${event.waterDistanceCm}cm`,
+              `percent=${event.waterPercent}%`,
+              `sensorPresent=${event.sensorPresent}`,
             );
           }
           break;
@@ -385,6 +391,8 @@ export function useRobotSocket(
     waterSprayOn,
     tankFull,
     waterDistanceCm,
+    waterPercent,
+    sensorPresent,
     sendWaterRefill,
     sendWaterSpray,
     // Horn

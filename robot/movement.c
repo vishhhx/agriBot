@@ -19,9 +19,9 @@ const char* WIFI_PASSWORD = "gangu123";
 // =====================================================
 
 const char* WS_HOST =
-    "3.6.221.61";
+    "rf3pnggh-5000.inc1.devtunnels.ms";
 
-const uint16_t WS_PORT = 5000;
+const uint16_t WS_PORT = 443;
 
 const char* WS_PATH = "/ws";
 
@@ -417,7 +417,7 @@ void setupHorn() {
 
     pinMode(HORN_PIN, OUTPUT);
 
-    digitalWrite(HORN_PIN, LOW);
+    noTone(HORN_PIN);
 
     hornState = false;
 
@@ -431,7 +431,7 @@ void setupHorn() {
 
 void hornOn() {
 
-    digitalWrite(HORN_PIN, HIGH);
+    tone(HORN_PIN, 1000);
 
     hornState = true;
 
@@ -445,7 +445,7 @@ void hornOn() {
 
 void hornOff() {
 
-    digitalWrite(HORN_PIN, LOW);
+    noTone(HORN_PIN);
 
     hornState = false;
 
@@ -1711,11 +1711,19 @@ void setupWebSocket() {
     );
 
 
-    webSocket.begin(
-        WS_HOST,
-        WS_PORT,
-        WS_PATH
-    );
+    if (WS_PORT == 443) {
+        webSocket.beginSSL(
+            WS_HOST,
+            WS_PORT,
+            WS_PATH
+        );
+    } else {
+        webSocket.begin(
+            WS_HOST,
+            WS_PORT,
+            WS_PATH
+        );
+    }
 
 
     webSocket.onEvent(

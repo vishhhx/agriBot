@@ -1,7 +1,7 @@
 "use client";
 
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Square } from "lucide-react";
-import { useCallback, useEffect, useRef } from "react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Square, Gauge } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { MovementDirection } from "@/lib/robot-events";
 
 interface MovementControllerProps {
@@ -25,6 +25,7 @@ const controls: Array<{
 
 export function MovementController({ disabled, onMove }: MovementControllerProps) {
   const activeKeyRef = useRef<string | null>(null);
+  const [speed, setSpeed] = useState<number>(80);
 
   const stop = useCallback(() => {
     activeKeyRef.current = null;
@@ -61,7 +62,7 @@ export function MovementController({ disabled, onMove }: MovementControllerProps
       console.log(`[KEY DOWN] ${keyName} => ${command}`);
 
       activeKeyRef.current = keyLower;
-      onMove(command, command === "STOP" ? 0 : 100);
+      onMove(command, command === "STOP" ? 0 : speed);
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
@@ -92,10 +93,10 @@ export function MovementController({ disabled, onMove }: MovementControllerProps
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
     };
-  }, [disabled, onMove, stop]);
+  }, [disabled, onMove, stop, speed]);
 
   return (
-    <div className="flex flex-col items-center gap-5 select-none p-4 rounded-3xl bg-slate-950/60 backdrop-blur-xl border border-emerald-500/20 shadow-2xl">
+    <div className="flex flex-col items-center gap-4 select-none p-4 rounded-3xl bg-slate-950/60 backdrop-blur-xl border border-emerald-500/20 shadow-2xl">
       <div className="flex items-center justify-between w-full px-2 text-xs font-semibold tracking-wider text-emerald-400/80 uppercase">
         <span>Movement Matrix</span>
         <span className="flex items-center gap-1.5">
@@ -115,8 +116,8 @@ export function MovementController({ disabled, onMove }: MovementControllerProps
               aria-label={label}
               onPointerDown={(e) => {
                 e.preventDefault();
-                console.log(`[BUTTON POINTER DOWN] ${command}`);
-                onMove(command, isStop ? 0 : 100);
+                console.log(`[BUTTON POINTER DOWN] ${command} speed=${speed}`);
+                onMove(command, isStop ? 0 : speed);
               }}
               onPointerUp={(e) => {
                 e.preventDefault();
@@ -146,6 +147,44 @@ export function MovementController({ disabled, onMove }: MovementControllerProps
             </button>
           );
         })}
+      </div>
+
+      {/* Speed Controller Section */}
+      <div className="w-full flex flex-col gap-2 p-3 bg-slate-900/90 rounded-2xl border border-slate-800">
+        <div className="flex items-center justify-between text-xs text-slate-300 font-semibold">
+          <span className="flex items-center gap-1.5 text-emerald-400">
+            <Gauge size={14} />
+            Wheel Speed Controller
+          </span>
+          <span className="font-mono text-emerald-400 font-bold">{speed}%</span>
+        </div>
+        <input
+          type="range"
+          min={20}
+          max={100}
+          step={5}
+          value={speed}
+          disabled={disabled}
+          onChange={(e) => setSpeed(Number(e.target.value))}
+          className="w-full accent-emerald-400 bg-slate-800 h-2 rounded-lg cursor-pointer disabled:opacity-30"
+        />
+        <div className="flex justify-between items-center pt-1 gap-1">
+          {[25, 50, 75, 100].map((preset) => (
+            <button
+              key={preset}
+              type="button"
+              disabled={disabled}
+              onClick={() => setSpeed(preset)}
+              className={`flex-1 py-1 rounded-lg text-[10px] font-mono font-bold transition border ${
+                speed === preset
+                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50"
+                  : "bg-slate-800/80 text-slate-400 border-slate-700 hover:text-slate-200"
+              }`}
+            >
+              {preset}%
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono">

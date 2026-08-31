@@ -344,11 +344,13 @@ export function handleWaterEvent(
       sprayPump: message.sprayPump,
       tankFull: message.tankFull,
       waterDistanceCm: message.waterDistanceCm,
+      waterPercent: message.waterPercent,
+      sensorPresent: message.sensorPresent,
     });
   }
 
   console.log(
-    `[WATER EVENT] robot=${message.robotId} event=${message.event} refill=${message.refillPump} spray=${message.sprayPump} tankFull=${message.tankFull} dist=${message.waterDistanceCm}cm`,
+    `[WATER EVENT] robot=${message.robotId} event=${message.event} refill=${message.refillPump} spray=${message.sprayPump} tankFull=${message.tankFull} dist=${message.waterDistanceCm}cm percent=${message.waterPercent}% sensorPresent=${message.sensorPresent}`,
   );
 
   // ---------------------------------------------------
@@ -366,6 +368,8 @@ export function handleWaterEvent(
       sprayPump: message.sprayPump,
       tankFull: message.tankFull,
       waterDistanceCm: message.waterDistanceCm,
+      waterPercent: message.waterPercent,
+      sensorPresent: message.sensorPresent,
     });
     console.log(`[WATER EVENT → MOVEMENT BOT] event=${message.event}`);
   }

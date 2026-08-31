@@ -584,6 +584,8 @@ export default function BotPage() {
     waterSprayOn,
     tankFull,
     waterDistanceCm,
+    waterPercent,
+    sensorPresent,
     sendWaterRefill,
     sendWaterSpray,
     sendHorn,
@@ -895,6 +897,8 @@ export default function BotPage() {
               sprayOn={waterSprayOn}
               tankFull={tankFull}
               waterDistanceCm={waterDistanceCm}
+              waterPercent={waterPercent}
+              sensorPresent={sensorPresent}
               onRefill={sendWaterRefill}
               onSpray={sendWaterSpray}
             />

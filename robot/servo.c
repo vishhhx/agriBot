@@ -15,8 +15,8 @@ const char* WIFI_PASSWORD = "gangu123";
 // WEBSOCKET SERVER CONFIGURATION
 // =====================================================
 
-const char* WS_HOST       = "3.6.221.61";
-const uint16_t WS_PORT    = 5000;
+const char* WS_HOST       = "rf3pnggh-5000.inc1.devtunnels.ms";
+const uint16_t WS_PORT    = 443;
 const char* WS_PATH       = "/ws";
 
 // =====================================================
@@ -54,14 +54,14 @@ Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(PCA9685_ADDRESS);
 #define SERVO_MIN_PULSE 500
 #define SERVO_MAX_PULSE 2500
 
-// Camera Servo Limits & Step
+// Camera Servo Limits & Step (Pan: 360°, Tilt: 180°)
 #define CAMERA_STEP 10
-#define PAN_MIN_ANGLE 10
-#define PAN_MAX_ANGLE 170
-#define TILT_MIN_ANGLE 10
-#define TILT_MAX_ANGLE 170
+#define PAN_MIN_ANGLE 0
+#define PAN_MAX_ANGLE 360
+#define TILT_MIN_ANGLE 0
+#define TILT_MAX_ANGLE 180
 
-int panAngle = 90;
+int panAngle = 180;
 int tiltAngle = 90;
 
 // Spray Servo Angles
@@ -88,8 +88,8 @@ void cameraUp();
 void cameraDown();
 void sprayOn();
 void sprayOff();
-uint16_t angleToPulse(int angle);
-void setServoAngle(uint8_t channel, int angle);
+uint16_t angleToPulse(int angle, int maxAngle = 180);
+void setServoAngle(uint8_t channel, int angle, int maxAngle = 180);
 
 // =====================================================
 // WIFI CONNECTION
@@ -132,22 +132,24 @@ void connectWiFi() {
 // SERVO PWM CONVERSION
 // =====================================================
 
-uint16_t angleToPulse(int angle) {
-  angle = constrain(angle, 0, 180);
-  long pulseWidth = map(angle, 0, 180, SERVO_MIN_PULSE, SERVO_MAX_PULSE);
+uint16_t angleToPulse(int angle, int maxAngle) {
+  angle = constrain(angle, 0, maxAngle);
+  long pulseWidth = map(angle, 0, maxAngle, SERVO_MIN_PULSE, SERVO_MAX_PULSE);
   uint16_t pulse = (uint16_t)(pulseWidth * 4096L / 20000L);
   return pulse;
 }
 
-void setServoAngle(uint8_t channel, int angle) {
-  angle = constrain(angle, 0, 180);
-  uint16_t pulse = angleToPulse(angle);
+void setServoAngle(uint8_t channel, int angle, int maxAngle) {
+  angle = constrain(angle, 0, maxAngle);
+  uint16_t pulse = angleToPulse(angle, maxAngle);
   pwm.setPWM(channel, 0, pulse);
 
   Serial.print("[SERVO] CH");
   Serial.print(channel);
   Serial.print(" -> ");
   Serial.print(angle);
+  Serial.print("°/");
+  Serial.print(maxAngle);
   Serial.print("° | PWM=");
   Serial.println(pulse);
 }
@@ -157,37 +159,37 @@ void setServoAngle(uint8_t channel, int angle) {
 // =====================================================
 
 void centerCamera() {
-  panAngle = 90;
+  panAngle = 180;
   tiltAngle = 90;
-  setServoAngle(PAN_SERVO_CHANNEL, panAngle);
-  setServoAngle(TILT_SERVO_CHANNEL, tiltAngle);
-  Serial.println("[CAMERA] CENTER (90°, 90°)");
+  setServoAngle(PAN_SERVO_CHANNEL, panAngle, 360);
+  setServoAngle(TILT_SERVO_CHANNEL, tiltAngle, 180);
+  Serial.println("[CAMERA] CENTER (180°/360°, 90°/180°)");
 }
 
 void cameraLeft() {
   panAngle = constrain(panAngle - CAMERA_STEP, PAN_MIN_ANGLE, PAN_MAX_ANGLE);
-  setServoAngle(PAN_SERVO_CHANNEL, panAngle);
+  setServoAngle(PAN_SERVO_CHANNEL, panAngle, 360);
   Serial.print("[CAMERA] LEFT -> ");
   Serial.println(panAngle);
 }
 
 void cameraRight() {
   panAngle = constrain(panAngle + CAMERA_STEP, PAN_MIN_ANGLE, PAN_MAX_ANGLE);
-  setServoAngle(PAN_SERVO_CHANNEL, panAngle);
+  setServoAngle(PAN_SERVO_CHANNEL, panAngle, 360);
   Serial.print("[CAMERA] RIGHT -> ");
   Serial.println(panAngle);
 }
 
 void cameraUp() {
   tiltAngle = constrain(tiltAngle + CAMERA_STEP, TILT_MIN_ANGLE, TILT_MAX_ANGLE);
-  setServoAngle(TILT_SERVO_CHANNEL, tiltAngle);
+  setServoAngle(TILT_SERVO_CHANNEL, tiltAngle, 180);
   Serial.print("[CAMERA] UP -> ");
   Serial.println(tiltAngle);
 }
 
 void cameraDown() {
   tiltAngle = constrain(tiltAngle - CAMERA_STEP, TILT_MIN_ANGLE, TILT_MAX_ANGLE);
-  setServoAngle(TILT_SERVO_CHANNEL, tiltAngle);
+  setServoAngle(TILT_SERVO_CHANNEL, tiltAngle, 180);
   Serial.print("[CAMERA] DOWN -> ");
   Serial.println(tiltAngle);
 }
@@ -523,7 +525,11 @@ void setupWebSocket() {
   Serial.print("[WS] Path: ");
   Serial.println(WS_PATH);
 
-  webSocket.begin(WS_HOST, WS_PORT, WS_PATH);
+  if (WS_PORT == 443) {
+    webSocket.beginSSL(WS_HOST, WS_PORT, WS_PATH);
+  } else {
+    webSocket.begin(WS_HOST, WS_PORT, WS_PATH);
+  }
   webSocket.onEvent(webSocketEvent);
 
   webSocket.setReconnectInterval(3000);

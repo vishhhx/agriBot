@@ -21,7 +21,8 @@ export type WaterEventName =
   | "TANK_FULL"
   | "SPRAY_STARTED"
   | "SPRAY_STOPPED"
-  | "ALL_PUMPS_STOPPED";
+  | "ALL_PUMPS_STOPPED"
+  | "SENSOR_DISCONNECTED";
 
 export type Message =
 
@@ -191,6 +192,8 @@ export type Message =
       sprayPump: boolean;
       tankFull: boolean;
       waterDistanceCm: number;
+      waterPercent?: number;
+      sensorPresent?: boolean;
     }
 
   // ---------------------------------------------------
