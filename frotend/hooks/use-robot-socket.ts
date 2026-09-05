@@ -23,6 +23,23 @@ export type Telemetry = {
 
 const DEFAULT_ROLES: BotRole[] = ["MOVEMENT_AND_OTHER"];
 
+function createRequestId() {
+  const cryptoApi = globalThis.crypto;
+
+  if (cryptoApi?.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    cryptoApi.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0"))
+      .join("")
+      .replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export function useRobotSocket(
   robotId: string,
   roles: BotRole[] = DEFAULT_ROLES,
@@ -219,7 +236,7 @@ export function useRobotSocket(
         return false;
       }
 
-      const requestId = crypto.randomUUID();
+      const requestId = createRequestId();
 
       console.log(
         `[FRONTEND MOVEMENT]\n` +
@@ -277,7 +294,7 @@ export function useRobotSocket(
         robotId,
         command,
         angle,
-        requestId: crypto.randomUUID(),
+        requestId: createRequestId(),
       };
 
       console.log("[WS OUT][SERVO]", message);
@@ -311,7 +328,7 @@ export function useRobotSocket(
         type: "servo:spray" as const,
         robotId,
         command,
-        requestId: crypto.randomUUID(),
+        requestId: createRequestId(),
       };
 
       console.log("[WS OUT][SPRAY]", message);
@@ -348,7 +365,7 @@ export function useRobotSocket(
         type: "water:refill" as const,
         robotId,
         state,
-        requestId: crypto.randomUUID(),
+        requestId: createRequestId(),
       };
 
       console.log("[WS OUT][WATER REFILL]", message);
@@ -366,7 +383,7 @@ export function useRobotSocket(
         type: "water:spray" as const,
         robotId,
         state,
-        requestId: crypto.randomUUID(),
+        requestId: createRequestId(),
       };
       robotSocket.sendWaterSprayCommand(message);
     },
@@ -381,7 +398,7 @@ export function useRobotSocket(
         type: "horn:beep",
         robotId,
         beeps,
-        requestId: crypto.randomUUID(),
+        requestId: createRequestId(),
       });
       console.log("[HORN] beeps=", beeps);
     },

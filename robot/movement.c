@@ -19,9 +19,9 @@ const char* WIFI_PASSWORD = "gangu123";
 // =====================================================
 
 const char* WS_HOST =
-    "rf3pnggh-5000.inc1.devtunnels.ms";
+    "ec2-3-6-221-61.ap-south-1.compute.amazonaws.com";
 
-const uint16_t WS_PORT = 443;
+const uint16_t WS_PORT = 5000;
 
 const char* WS_PATH = "/ws";
 
@@ -34,7 +34,7 @@ const char* ROBOT_ID =
     "robot_prash_001";
 
 const char* ROBOT_SECRET =
-    "skhtpAftcrkL-ujQK_9-Hxxo9dpeauBuHuSBcQmcQzI";
+    "H3bb8sQml50PUAENe-TIrpvZTKqk33TVpBcNd44uGv0";
 
 
 // =====================================================
