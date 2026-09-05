@@ -20,7 +20,11 @@ import {
   handleRobotTelemetry,
   handleRobotStatus,
 } from "./handlers/robot";
-import { handleCameraEvent, handleCameraFrame } from "./handlers/camera";
+import {
+  handleCameraEvent,
+  handleCameraFrame,
+  handleCameraStreamCommand,
+} from "./handlers/camera";
 import {
   handleCameraServoCommand,
   handleSprayServoCommand,
@@ -467,6 +471,11 @@ export async function handleWebsocketMessages(
       //   await handleCameraEvent(ws, message);
       //   break;
       // }
+
+      case "camera:stream": {
+        handleCameraStreamCommand(ws, message);
+        break;
+      }
 
       // ===============================================
       // CAMERA SERVO

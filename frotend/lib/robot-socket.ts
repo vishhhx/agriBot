@@ -1,5 +1,6 @@
 import type {
   BotRole,
+  CameraStreamCommand,
   HornBeepCommand,
   MovementCommand,
   RobotClientEvent,
@@ -53,8 +54,7 @@ class RobotSocket {
 
     let wsUrl: string;
 
-    const baseUrl = process.env.NEXT_PUBLIC_WS_URL
-      ?? "ws://localhost:5000";
+    const baseUrl = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:5000";
 
     try {
       const res = await fetch("/api/auth/ws-token", {
@@ -62,18 +62,29 @@ class RobotSocket {
       });
 
       if (res.ok) {
-        const json = await res.json() as { success: boolean; data: { token: string } };
+        const json = (await res.json()) as {
+          success: boolean;
+          data: { token: string };
+        };
         wsUrl = `${baseUrl}?token=${encodeURIComponent(json.data.token)}`;
         console.log("[RobotSocket] connecting with WS token");
       } else {
         // Not logged in or token fetch failed — connect anonymously.
         // robot:subscribe will be rejected by the server.
         wsUrl = baseUrl;
-        console.warn("[RobotSocket] ws-token fetch failed (status", res.status, ") — connecting unauthenticated");
+        console.warn(
+          "[RobotSocket] ws-token fetch failed (status",
+          res.status,
+          ") — connecting unauthenticated",
+        );
       }
     } catch (err) {
       wsUrl = baseUrl;
-      console.warn("[RobotSocket] ws-token fetch error:", err, "— connecting unauthenticated");
+      console.warn(
+        "[RobotSocket] ws-token fetch error:",
+        err,
+        "— connecting unauthenticated",
+      );
     }
 
     // Guard: another connect() call may have raced us.
@@ -101,7 +112,12 @@ class RobotSocket {
       this.notifyConnectionChange(true);
 
       for (const [robotId, roles] of this.subscribedRobots) {
-        console.log("[RobotSocket] re-subscribing robotId=", robotId, "roles=", roles);
+        console.log(
+          "[RobotSocket] re-subscribing robotId=",
+          robotId,
+          "roles=",
+          roles,
+        );
         this.send({ type: "robot:subscribe", robotId, roles });
       }
     };
@@ -109,7 +125,9 @@ class RobotSocket {
     socket.onmessage = (message) => {
       // Binary message = camera JPEG frame.
       if (message.data instanceof Blob) {
-        this.binaryListeners.forEach((listener) => listener(message.data as Blob));
+        this.binaryListeners.forEach((listener) =>
+          listener(message.data as Blob),
+        );
         return;
       }
 
@@ -147,7 +165,14 @@ class RobotSocket {
   }
 
   subscribe(robotId: string, roles: BotRole[]) {
-    console.log("[RobotSocket] subscribe robotId=", robotId, "roles=", roles, "wsState=", this.socket?.readyState ?? null);
+    console.log(
+      "[RobotSocket] subscribe robotId=",
+      robotId,
+      "roles=",
+      roles,
+      "wsState=",
+      this.socket?.readyState ?? null,
+    );
     this.subscribedRobots.set(robotId, roles);
     this.send({ type: "robot:subscribe", robotId, roles });
   }
@@ -175,6 +200,10 @@ class RobotSocket {
   }
 
   sendServoSprayCommand(command: ServoSprayCommand) {
+    return this.send(command);
+  }
+
+  sendCameraStreamCommand(command: CameraStreamCommand) {
     return this.send(command);
   }
 

@@ -53,6 +53,7 @@ WebSocketsClient webSocket;
 
 bool wsConnected = false;
 bool cameraRegistered = false;
+bool streamEnabled = true;
 
 
 // =====================================================
@@ -861,6 +862,22 @@ void webSocketEvent(
             return;
         }
 
+        if (strcmp(messageType, "COMMAND") == 0)
+        {
+            JsonObject data = doc["data"];
+            const char* command = data["command"] | "";
+            const char* state = data["state"] | "";
+
+            if (strcmp(command, "STREAM") == 0)
+            {
+                streamEnabled = strcmp(state, "ON") == 0;
+                Serial.print("[CAMERA] Stream ");
+                Serial.println(streamEnabled ? "ON" : "OFF");
+            }
+
+            return;
+        }
+
 
         // =============================================
         // ERROR
@@ -1235,7 +1252,8 @@ void loop()
 
     if (
         wsConnected &&
-        cameraRegistered
+        cameraRegistered &&
+        streamEnabled
     )
     {
         unsigned long now = millis();

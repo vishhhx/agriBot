@@ -3,6 +3,59 @@ import { robots } from "../state";
 import { connections, getConnectionLabel, send } from "../connections";
 import { type Message } from "../types";
 
+export function handleCameraStreamCommand(
+  ws: WebSocket,
+  message: Extract<Message, { type: "camera:stream" }>,
+) {
+  const connection = connections.get(ws);
+  if (!connection || connection.type !== "USER") {
+    send(ws, { type: "ERROR", message: "Only users can control the camera" });
+    return;
+  }
+
+  if (!connection.robotIds.has(message.robotId)) {
+    send(ws, { type: "ERROR", message: "Robot subscription required" });
+    return;
+  }
+
+  if (!connection.roles.get(message.robotId)?.has("CAMERA")) {
+    send(ws, { type: "ERROR", message: "Camera role subscription required" });
+    return;
+  }
+
+  const robot = robots.get(message.robotId);
+  const cameraBot = robot?.bots.get("CAMERA");
+  if (!cameraBot) {
+    send(ws, { type: "ERROR", message: "Camera module is not connected" });
+    return;
+  }
+
+  send(cameraBot.ws, {
+    type: "COMMAND",
+    data: {
+      robotId: message.robotId,
+      command: "STREAM",
+      state: message.state,
+      userId: connection.userId,
+      requestId: message.requestId,
+    },
+  });
+
+  if (!robot) return;
+  for (const user of robot.users.values()) {
+    const userConnection = connections.get(user.ws);
+    if (userConnection?.type !== "USER") continue;
+    if (!userConnection.roles.get(message.robotId)?.has("CAMERA")) continue;
+
+    send(user.ws, {
+      type: "camera:stream",
+      robotId: message.robotId,
+      state: message.state,
+      requestId: message.requestId,
+    });
+  }
+}
+
 // =====================================================
 // CAMERA EVENT
 // =====================================================

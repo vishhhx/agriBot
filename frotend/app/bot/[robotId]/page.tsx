@@ -96,9 +96,11 @@ const isBotStatus = (value: unknown): value is BotStatus =>
 function CameraBg({
   frame,
   cameraConnected,
+  streamEnabled = true,
 }: {
   frame: string | null;
   cameraConnected: boolean;
+  streamEnabled?: boolean;
 }) {
   return (
     <div className="absolute inset-0 bg-slate-100">
@@ -112,7 +114,16 @@ function CameraBg({
         />
       ) : (
         <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-gradient-to-br from-slate-100 via-emerald-50/20 to-sky-50/30">
-          {cameraConnected ? (
+          {!streamEnabled ? (
+            <>
+              <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-white shadow-xl shadow-slate-200/80 border border-slate-200/80">
+                <VideoOff size={36} className="text-slate-400" aria-hidden />
+              </div>
+              <p className="text-sm font-semibold text-slate-500">
+                Camera Stream Off
+              </p>
+            </>
+          ) : cameraConnected ? (
             <>
               <div className="h-12 w-12 animate-spin rounded-full border-3 border-emerald-500 border-t-transparent shadow-sm" />
               <p className="text-sm font-semibold text-slate-600">
@@ -626,11 +637,13 @@ export default function BotPage() {
     espRoles,
     movementConnected,
     cameraConnected,
+    cameraStreamOn,
     cameraFrame,
     servoConnected,
     sprayOn,
     sendMovement,
     sendServoCamera,
+    sendCameraStream,
     sendSpray,
     waterPumpConnected,
     refillOn,
@@ -791,7 +804,11 @@ export default function BotPage() {
          =================================================== */}
       <main className="mobile-control-hud lg:hidden relative h-screen w-screen overflow-hidden bg-slate-900 text-slate-800 select-none touch-none">
         {/* Fullscreen Camera Stream Background */}
-        <CameraBg frame={cameraFrame} cameraConnected={cameraConnected} />
+        <CameraBg
+          frame={cameraFrame}
+          cameraConnected={cameraConnected}
+          streamEnabled={cameraStreamOn}
+        />
 
         {/* Floating Game HUD Overlay */}
         <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-3">
@@ -820,6 +837,21 @@ export default function BotPage() {
                   {resolvedStatus}
                 </span>
               </div>
+
+              <button
+                type="button"
+                disabled={!cameraConnected || controlDisabled}
+                onClick={() => sendCameraStream(cameraStreamOn ? "OFF" : "ON")}
+                className="flex h-10 items-center gap-1.5 rounded-2xl border border-slate-200/80 bg-white/90 px-2.5 text-[10px] font-extrabold text-slate-700 shadow-md backdrop-blur-md disabled:opacity-40"
+                title={
+                  cameraStreamOn
+                    ? "Turn camera stream off"
+                    : "Turn camera stream on"
+                }
+              >
+                {cameraStreamOn ? <VideoOff size={15} /> : <Video size={15} />}
+                <span>{cameraStreamOn ? "Camera Off" : "Camera On"}</span>
+              </button>
             </div>
 
             {/* Right: All ESP Roles Indicators */}
@@ -1101,6 +1133,26 @@ export default function BotPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={!cameraConnected || controlDisabled}
+                    onClick={() =>
+                      sendCameraStream(cameraStreamOn ? "OFF" : "ON")
+                    }
+                    className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-extrabold text-slate-700 disabled:opacity-40"
+                    title={
+                      cameraStreamOn
+                        ? "Turn camera stream off"
+                        : "Turn camera stream on"
+                    }
+                  >
+                    {cameraStreamOn ? (
+                      <VideoOff size={13} />
+                    ) : (
+                      <Video size={13} />
+                    )}
+                    <span>{cameraStreamOn ? "Stream Off" : "Stream On"}</span>
+                  </button>
                   {cameraConnected && (
                     <span className="flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-700">
                       <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
@@ -1115,6 +1167,7 @@ export default function BotPage() {
                 <CameraBg
                   frame={cameraFrame}
                   cameraConnected={cameraConnected}
+                  streamEnabled={cameraStreamOn}
                 />
 
                 {/* FLOATING TOP-CENTER EYE SERVO CONTROLLER */}

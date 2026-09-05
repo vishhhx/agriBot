@@ -153,6 +153,13 @@ export type CameraStatusEvent = {
   connected: boolean;
 };
 
+export type CameraStreamCommand = {
+  type: "camera:stream";
+  robotId: string;
+  state: "ON" | "OFF";
+  requestId?: string;
+};
+
 export type CameraEvent = {
   type: "camera:event";
   robotId: string;
@@ -160,6 +167,8 @@ export type CameraEvent = {
   event: "STREAM_STARTED" | "STREAM_STOPPED" | "CAMERA_READY" | "CAMERA_ERROR";
   payload?: unknown;
 };
+
+export type CameraStreamEvent = CameraStreamCommand;
 
 export type ServoAcceptedEvent = {
   type: "servo:accepted";
@@ -247,6 +256,7 @@ export type RobotServerEvent =
   | RobotErrorEvent
   | MovementStatusEvent
   | CameraStatusEvent
+  | CameraStreamEvent
   | CameraEvent
   | ServoStatusEvent
   | ServoAcceptedEvent
@@ -264,6 +274,7 @@ export type RobotClientEvent =
   | MovementCommand
   | ServoCameraCommand
   | ServoSprayCommand
+  | CameraStreamCommand
   | WaterRefillCommand
   | WaterSprayCommand
   | HornBeepCommand;

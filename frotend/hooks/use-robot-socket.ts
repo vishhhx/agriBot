@@ -6,6 +6,7 @@ import { robotSocket } from "@/lib/robot-socket";
 import type {
   BotRole,
   CameraServoCommand,
+  CameraStreamCommand,
   MovementDirection,
   RobotStatus,
   SprayCommand,
@@ -53,6 +54,7 @@ export function useRobotSocket(
   // ESP Role status state
   const [movementConnected, setMovementConnected] = useState(false);
   const [cameraConnected, setCameraConnected] = useState(false);
+  const [cameraStreamOn, setCameraStreamOn] = useState(true);
   const [servoConnected, setServoConnected] = useState(false);
   const [sprayOn, setSprayOn] = useState(false);
 
@@ -102,6 +104,13 @@ export function useRobotSocket(
 
         case "camera:status":
           if (event.robotId === robotId) setCameraConnected(event.connected);
+          break;
+
+        case "camera:stream":
+          if (event.robotId === robotId) {
+            setCameraStreamOn(event.state === "ON");
+            if (event.state === "OFF") setCameraFrame(null);
+          }
           break;
 
         case "servo:status":
@@ -342,6 +351,20 @@ export function useRobotSocket(
     [robotId],
   );
 
+  const sendCameraStream = useCallback(
+    (state: "ON" | "OFF") => {
+      const message: CameraStreamCommand = {
+        type: "camera:stream",
+        robotId,
+        state,
+        requestId: createRequestId(),
+      };
+      setCameraStreamOn(state === "ON");
+      return robotSocket.sendCameraStreamCommand(message);
+    },
+    [robotId],
+  );
+
   const sendWaterRefill = useCallback(
     (state: WaterPumpState) => {
       console.log("[WATER REFILL] Requested:", state);
@@ -422,12 +445,14 @@ export function useRobotSocket(
     espRoles,
     movementConnected,
     cameraConnected,
+    cameraStreamOn,
     cameraFrame,
     servoConnected,
     sprayOn,
     sendMovement,
     sendServoCamera,
     sendSpray,
+    sendCameraStream,
     // Water pump
     waterPumpConnected,
     refillOn,

@@ -96,6 +96,12 @@ export type Message =
       payload?: unknown;
     }
   | {
+      type: "camera:stream";
+      robotId: string;
+      state: "ON" | "OFF";
+      requestId?: string;
+    }
+  | {
       type: "BOT_COMMAND";
       data: {
         robotId: string;

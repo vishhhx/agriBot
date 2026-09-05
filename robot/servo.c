@@ -4,6 +4,7 @@
 #include <Wire.h>
 #include <Adafruit_PWMServoDriver.h>
 
+
 // =====================================================
 // WIFI CONFIGURATION
 // =====================================================
@@ -56,6 +57,9 @@ Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(PCA9685_ADDRESS);
 
 // Camera limits: pan 0..360°, tilt -60°..90° around the centered 0° position.
 #define CAMERA_STEP 10
+
+#define CAMERA_SMOOTH_STEP 2
+#define CAMERA_SMOOTH_INTERVAL 20
 #define PAN_MIN_ANGLE 0
 #define PAN_MAX_ANGLE 360
 #define TILT_MIN_ANGLE -60
@@ -64,12 +68,25 @@ Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(PCA9685_ADDRESS);
 
 int panAngle = 180;
 int tiltAngle = 0;
+int targetPanAngle = 180;
+int targetTiltAngle = 0;
+unsigned long lastCameraMove = 0;
 
-// Spray Servo Angles
+// Spray Servo Motion
+// Logical range: -80° to +80°
+// Standard servo positions: 10° to 170° around 90° center.
 #define SPRAY_OFF_ANGLE 0
-#define SPRAY_ON_ANGLE  90
+#define SPRAY_MIN_ANGLE 10
+#define SPRAY_MAX_ANGLE 170
+#define SPRAY_STEP 4
+#define SPRAY_INTERVAL 8
 
 bool sprayState = false;
+bool sprayMovingToRange = false;
+int sprayAngle1 = 0;
+int sprayAngle2 = 0;
+int sprayDirection = SPRAY_STEP;
+unsigned long lastSprayMove = 0;
 
 // =====================================================
 // FUNCTION DECLARATIONS
@@ -92,6 +109,9 @@ void sprayOff();
 uint16_t angleToPulse(int angle, int maxAngle = 180);
 void setServoAngle(uint8_t channel, int angle, int maxAngle = 180);
 void setTiltAngle(int angle);
+void updateSprayMotion();
+void updateCameraMotion();
+void setSprayAngles(int angle1);
 
 // =====================================================
 // WIFI CONNECTION
@@ -146,14 +166,7 @@ void setServoAngle(uint8_t channel, int angle, int maxAngle) {
   uint16_t pulse = angleToPulse(angle, maxAngle);
   pwm.setPWM(channel, 0, pulse);
 
-  Serial.print("[SERVO] CH");
-  Serial.print(channel);
-  Serial.print(" -> ");
-  Serial.print(angle);
-  Serial.print("°/");
-  Serial.print(maxAngle);
-  Serial.print("° | PWM=");
-  Serial.println(pulse);
+
 }
 
 // =====================================================
@@ -161,39 +174,25 @@ void setServoAngle(uint8_t channel, int angle, int maxAngle) {
 // =====================================================
 
 void centerCamera() {
-  panAngle = 180;
-  tiltAngle = 0;
-  setServoAngle(PAN_SERVO_CHANNEL, panAngle, 360);
-  setTiltAngle(tiltAngle);
+  targetPanAngle = 180;
+  targetTiltAngle = 0;
   Serial.println("[CAMERA] CENTER (PAN 180°/360°, TILT 0°)");
 }
 
 void cameraLeft() {
-  panAngle = constrain(panAngle - CAMERA_STEP, PAN_MIN_ANGLE, PAN_MAX_ANGLE);
-  setServoAngle(PAN_SERVO_CHANNEL, panAngle, 360);
-  Serial.print("[CAMERA] LEFT -> ");
-  Serial.println(panAngle);
+  targetPanAngle = constrain(targetPanAngle - CAMERA_STEP, PAN_MIN_ANGLE, PAN_MAX_ANGLE);
 }
 
 void cameraRight() {
-  panAngle = constrain(panAngle + CAMERA_STEP, PAN_MIN_ANGLE, PAN_MAX_ANGLE);
-  setServoAngle(PAN_SERVO_CHANNEL, panAngle, 360);
-  Serial.print("[CAMERA] RIGHT -> ");
-  Serial.println(panAngle);
+  targetPanAngle = constrain(targetPanAngle + CAMERA_STEP, PAN_MIN_ANGLE, PAN_MAX_ANGLE);
 }
 
 void cameraUp() {
-  tiltAngle = constrain(tiltAngle + CAMERA_STEP, TILT_MIN_ANGLE, TILT_MAX_ANGLE);
-  setTiltAngle(tiltAngle);
-  Serial.print("[CAMERA] UP -> ");
-  Serial.println(tiltAngle);
+  targetTiltAngle = constrain(targetTiltAngle + CAMERA_STEP, TILT_MIN_ANGLE, TILT_MAX_ANGLE);
 }
 
 void cameraDown() {
-  tiltAngle = constrain(tiltAngle - CAMERA_STEP, TILT_MIN_ANGLE, TILT_MAX_ANGLE);
-  setTiltAngle(tiltAngle);
-  Serial.print("[CAMERA] DOWN -> ");
-  Serial.println(tiltAngle);
+  targetTiltAngle = constrain(targetTiltAngle - CAMERA_STEP, TILT_MIN_ANGLE, TILT_MAX_ANGLE);
 }
 
 // =====================================================
@@ -201,24 +200,103 @@ void cameraDown() {
 // =====================================================
 
 void sprayOn() {
+  if (sprayState) return;
+
   sprayState = true;
-  setServoAngle(SPRAY_SERVO_1_CHANNEL, SPRAY_ON_ANGLE);
-  setServoAngle(SPRAY_SERVO_2_CHANNEL, SPRAY_ON_ANGLE);
+  sprayMovingToRange = true;
+  sprayAngle1 = SPRAY_OFF_ANGLE;
+  sprayAngle2 = SPRAY_OFF_ANGLE;
+  sprayDirection = SPRAY_STEP;
+
+  setSprayAngles(sprayAngle1);
+
   Serial.println("[SPRAY] ON");
   sendServoEvent("SPRAY_ON");
 }
 
 void sprayOff() {
   sprayState = false;
-  setServoAngle(SPRAY_SERVO_1_CHANNEL, SPRAY_OFF_ANGLE);
-  setServoAngle(SPRAY_SERVO_2_CHANNEL, SPRAY_OFF_ANGLE);
+  sprayMovingToRange = false;
+  sprayAngle1 = SPRAY_OFF_ANGLE;
+  sprayAngle2 = SPRAY_OFF_ANGLE;
+
+  setSprayAngles(SPRAY_OFF_ANGLE);
+
   Serial.println("[SPRAY] OFF");
   sendServoEvent("SPRAY_OFF");
+}
+
+void updateSprayMotion() {
+  if (!sprayState) return;
+
+  unsigned long now = millis();
+  if (now - lastSprayMove < SPRAY_INTERVAL) return;
+  lastSprayMove = now;
+
+  if (sprayMovingToRange) {
+    // Start at 0°, then move to -80°/+80° positions (10°/170°).
+    sprayAngle1 += SPRAY_STEP;
+
+    if (sprayAngle1 >= SPRAY_MIN_ANGLE) {
+      sprayAngle1 = SPRAY_MIN_ANGLE;
+      sprayMovingToRange = false;
+    }
+
+    sprayAngle2 = 180 - sprayAngle1;
+
+    setSprayAngles(sprayAngle1);
+    return;
+  }
+
+  // CH2: 10° <-> 170°  (-80° <-> +80°)
+  // CH3: 170° <-> 10°  (+80° <-> -80°)
+  sprayAngle1 += sprayDirection;
+
+  if (sprayAngle1 >= SPRAY_MAX_ANGLE) {
+    sprayAngle1 = SPRAY_MAX_ANGLE;
+    sprayDirection = -SPRAY_STEP;
+  } else if (sprayAngle1 <= SPRAY_MIN_ANGLE) {
+    sprayAngle1 = SPRAY_MIN_ANGLE;
+    sprayDirection = SPRAY_STEP;
+  }
+
+  sprayAngle2 = 180 - sprayAngle1;
+
+  setSprayAngles(sprayAngle1);
 }
 
 void setTiltAngle(int angle) {
   tiltAngle = constrain(angle, TILT_MIN_ANGLE, TILT_MAX_ANGLE);
   setServoAngle(TILT_SERVO_CHANNEL, tiltAngle + TILT_SERVO_CENTER, 180);
+}
+
+void setSprayAngles(int angle1) {
+  sprayAngle1 = constrain(angle1, SPRAY_OFF_ANGLE, 180);
+  sprayAngle2 = 180 - sprayAngle1;
+  setServoAngle(SPRAY_SERVO_1_CHANNEL, sprayAngle1);
+  setServoAngle(SPRAY_SERVO_2_CHANNEL, sprayAngle2);
+}
+
+void updateCameraMotion() {
+  unsigned long now = millis();
+  if (now - lastCameraMove < CAMERA_SMOOTH_INTERVAL) return;
+  lastCameraMove = now;
+
+  if (panAngle < targetPanAngle) {
+    panAngle = min(panAngle + CAMERA_SMOOTH_STEP, targetPanAngle);
+    setServoAngle(PAN_SERVO_CHANNEL, panAngle, 360);
+  } else if (panAngle > targetPanAngle) {
+    panAngle = max(panAngle - CAMERA_SMOOTH_STEP, targetPanAngle);
+    setServoAngle(PAN_SERVO_CHANNEL, panAngle, 360);
+  }
+
+  if (tiltAngle < targetTiltAngle) {
+    tiltAngle = min(tiltAngle + CAMERA_SMOOTH_STEP, targetTiltAngle);
+    setTiltAngle(tiltAngle);
+  } else if (tiltAngle > targetTiltAngle) {
+    tiltAngle = max(tiltAngle - CAMERA_SMOOTH_STEP, targetTiltAngle);
+    setTiltAngle(tiltAngle);
+  }
 }
 
 // =====================================================
@@ -254,23 +332,20 @@ void handleCameraCommand(const char* command, int angle) {
     }
   } else if (strcasecmp(command, "LEFT") == 0) {
     if (angle >= 0) {
-      panAngle = constrain(angle, PAN_MIN_ANGLE, PAN_MAX_ANGLE);
-      setServoAngle(PAN_SERVO_CHANNEL, panAngle);
+      targetPanAngle = constrain(angle, PAN_MIN_ANGLE, PAN_MAX_ANGLE);
     } else {
       cameraLeft();
     }
   } else if (strcasecmp(command, "RIGHT") == 0) {
     if (angle >= 0) {
-      panAngle = constrain(angle, PAN_MIN_ANGLE, PAN_MAX_ANGLE);
-      setServoAngle(PAN_SERVO_CHANNEL, panAngle);
+      targetPanAngle = constrain(angle, PAN_MIN_ANGLE, PAN_MAX_ANGLE);
     } else {
       cameraRight();
     }
   } else if (strcasecmp(command, "CENTER") == 0) {
     centerCamera();
   } else if (strcasecmp(command, "PAN") == 0 && angle >= 0) {
-    panAngle = constrain(angle, PAN_MIN_ANGLE, PAN_MAX_ANGLE);
-    setServoAngle(PAN_SERVO_CHANNEL, panAngle);
+    targetPanAngle = constrain(angle, PAN_MIN_ANGLE, PAN_MAX_ANGLE);
   } else if (strcasecmp(command, "TILT") == 0 && angle != -1) {
     setTiltAngle(angle);
   } else {
@@ -566,6 +641,8 @@ void setup() {
 
 void loop() {
   webSocket.loop();
+  updateCameraMotion();
+  updateSprayMotion();
 
   if (WiFi.status() != WL_CONNECTED) {
     static unsigned long lastWifiAttempt = 0;
