@@ -142,9 +142,11 @@ function CameraBg({
 function CameraEyeController({
   disabled,
   onServoCamera,
+  compact = false,
 }: {
   disabled: boolean;
   onServoCamera: (command: CameraServoCommand, angle?: number) => void;
+  compact?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [pupilPos, setPupilPos] = useState({ x: 0, y: 0 });
@@ -236,7 +238,8 @@ function CameraEyeController({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         className={[
-          "relative flex h-24 w-24 items-center justify-center rounded-full border-2 shadow-xl backdrop-blur-md cursor-grab active:cursor-grabbing",
+          "relative flex items-center justify-center rounded-full border-2 shadow-xl backdrop-blur-md cursor-grab active:cursor-grabbing",
+          compact ? "h-16 w-16" : "h-24 w-24",
           disabled
             ? "opacity-40 cursor-not-allowed border-slate-200 bg-white/60"
             : "border-slate-300/90 bg-white/85 shadow-slate-300/50 hover:bg-white",
@@ -248,32 +251,50 @@ function CameraEyeController({
         <div className="absolute w-full h-[1px] bg-slate-300/50" />
 
         {/* Directional indicator arrows */}
-        <ChevronUp size={12} className="absolute top-1 text-slate-400" />
-        <ChevronDown size={12} className="absolute bottom-1 text-slate-400" />
-        <ChevronLeft size={12} className="absolute left-1 text-slate-400" />
-        <ChevronRight size={12} className="absolute right-1 text-slate-400" />
+        <ChevronUp
+          size={compact ? 9 : 12}
+          className="absolute top-1 text-slate-400"
+        />
+        <ChevronDown
+          size={compact ? 9 : 12}
+          className="absolute bottom-1 text-slate-400"
+        />
+        <ChevronLeft
+          size={compact ? 9 : 12}
+          className="absolute left-1 text-slate-400"
+        />
+        <ChevronRight
+          size={compact ? 9 : 12}
+          className="absolute right-1 text-slate-400"
+        />
 
         {/* Eye Pupil Joystick */}
         <div
-          className="relative flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-tr from-sky-500 to-indigo-600 text-white shadow-md transition-transform duration-75"
+          className={`relative flex items-center justify-center rounded-full bg-gradient-to-tr from-sky-500 to-indigo-600 text-white shadow-md transition-transform duration-75 ${compact ? "h-7 w-7" : "h-10 w-10"}`}
           style={{
             transform: `translate3d(${pupilPos.x}px, ${pupilPos.y}px, 0)`,
           }}
         >
-          <Eye size={20} className="text-white drop-shadow-sm" />
-          <div className="absolute top-2 right-2 h-2 w-2 rounded-full bg-white/70" />
+          <Eye size={compact ? 14 : 20} className="text-white drop-shadow-sm" />
+          <div
+            className={`absolute bg-white/70 ${compact ? "top-1 right-1 h-1.5 w-1.5" : "top-2 right-2 h-2 w-2"}`}
+          />
         </div>
       </div>
 
-      <div className="flex items-center gap-1 rounded-full bg-white/80 px-2.5 py-0.5 border border-slate-200/80 shadow-xs backdrop-blur-sm">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+      <div
+        className={`flex items-center gap-1 rounded-full bg-white/80 border border-slate-200/80 shadow-xs backdrop-blur-sm ${compact ? "px-1.5 py-0" : "px-2.5 py-0.5"}`}
+      >
+        <span
+          className={`${compact ? "text-[8px]" : "text-[10px]"} font-bold uppercase tracking-wider text-slate-600`}
+        >
           Cam Pan & Tilt
         </span>
         <button
           type="button"
           disabled={disabled}
           onClick={() => onServoCamera("CENTER")}
-          className="text-emerald-600 hover:text-emerald-700 ml-1 text-[10px] font-bold"
+          className={`text-emerald-600 hover:text-emerald-700 ml-1 font-bold ${compact ? "text-[8px]" : "text-[10px]"}`}
           title="Center Camera"
         >
           [Reset]
@@ -290,9 +311,11 @@ function CameraEyeController({
 function GameDriveJoystick({
   disabled,
   onMove,
+  compact = false,
 }: {
   disabled: boolean;
   onMove: (cmd: MovementDirection, speed?: number) => boolean | void;
+  compact?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [knobPos, setKnobPos] = useState({ x: 0, y: 0 });
@@ -367,7 +390,8 @@ function GameDriveJoystick({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         className={[
-          "relative flex h-32 w-24 items-center justify-center rounded-full border-2 shadow-inner transition-all",
+          "relative flex items-center justify-center rounded-full border-2 shadow-inner transition-all",
+          compact ? "h-24 w-16" : "h-32 w-24",
           disabled
             ? "opacity-40 cursor-not-allowed border-slate-200 bg-slate-100"
             : "border-emerald-300/80 bg-gradient-to-b from-emerald-50/80 via-white to-emerald-50/80 cursor-grab active:cursor-grabbing",
@@ -375,21 +399,24 @@ function GameDriveJoystick({
       >
         {/* Directional Guide Arrows */}
         <div className="absolute top-2 flex flex-col items-center text-emerald-600">
-          <ArrowUp size={16} className="animate-bounce" />
+          <ArrowUp size={compact ? 12 : 16} className="animate-bounce" />
           <span className="text-[8px] font-black uppercase">FWD</span>
         </div>
         <div className="absolute bottom-2 flex flex-col items-center text-emerald-600">
           <span className="text-[8px] font-black uppercase">BACK</span>
-          <ArrowDown size={16} className="animate-bounce" />
+          <ArrowDown size={compact ? 12 : 16} className="animate-bounce" />
         </div>
 
         {/* Vertical Track Line */}
-        <div className="absolute h-20 w-1 rounded-full bg-emerald-200/70" />
+        <div
+          className={`absolute rounded-full bg-emerald-200/70 ${compact ? "h-14 w-0.5" : "h-20 w-1"}`}
+        />
 
         {/* Joystick Thumbstick Knob */}
         <div
           className={[
-            "relative flex h-14 w-14 items-center justify-center rounded-full border-2 border-white shadow-xl transition-transform duration-75",
+            "relative flex items-center justify-center rounded-full border-2 border-white shadow-xl transition-transform duration-75",
+            compact ? "h-10 w-10" : "h-14 w-14",
             isDragging
               ? "bg-gradient-to-tr from-emerald-500 to-teal-600 text-white scale-105"
               : "bg-gradient-to-tr from-slate-700 to-slate-900 text-white",
@@ -398,8 +425,12 @@ function GameDriveJoystick({
             transform: `translate3d(0, ${knobPos.y}px, 0)`,
           }}
         >
-          <div className="h-6 w-6 rounded-full border border-white/40 bg-white/20 flex items-center justify-center">
-            <div className="h-2 w-2 rounded-full bg-white" />
+          <div
+            className={`rounded-full border border-white/40 bg-white/20 flex items-center justify-center ${compact ? "h-4 w-4" : "h-6 w-6"}`}
+          >
+            <div
+              className={`${compact ? "h-1.5 w-1.5" : "h-2 w-2"} rounded-full bg-white`}
+            />
           </div>
         </div>
       </div>
@@ -410,9 +441,11 @@ function GameDriveJoystick({
 function GameSteerJoystick({
   disabled,
   onMove,
+  compact = false,
 }: {
   disabled: boolean;
   onMove: (cmd: MovementDirection, speed?: number) => boolean | void;
+  compact?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [knobPos, setKnobPos] = useState({ x: 0, y: 0 });
@@ -487,7 +520,8 @@ function GameSteerJoystick({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         className={[
-          "relative flex h-24 w-32 items-center justify-center rounded-full border-2 shadow-inner transition-all",
+          "relative flex items-center justify-center rounded-full border-2 shadow-inner transition-all",
+          compact ? "h-16 w-24" : "h-24 w-32",
           disabled
             ? "opacity-40 cursor-not-allowed border-slate-200 bg-slate-100"
             : "border-sky-300/80 bg-gradient-to-r from-sky-50/80 via-white to-sky-50/80 cursor-grab active:cursor-grabbing",
@@ -495,21 +529,24 @@ function GameSteerJoystick({
       >
         {/* Directional Guide Arrows */}
         <div className="absolute left-2 flex items-center gap-1 text-sky-600">
-          <ArrowLeft size={16} className="animate-bounce" />
+          <ArrowLeft size={compact ? 12 : 16} className="animate-bounce" />
           <span className="text-[8px] font-black uppercase">LFT</span>
         </div>
         <div className="absolute right-2 flex items-center gap-1 text-sky-600">
           <span className="text-[8px] font-black uppercase">RGT</span>
-          <ArrowRight size={16} className="animate-bounce" />
+          <ArrowRight size={compact ? 12 : 16} className="animate-bounce" />
         </div>
 
         {/* Horizontal Track Line */}
-        <div className="absolute w-20 h-1 rounded-full bg-sky-200/70" />
+        <div
+          className={`absolute rounded-full bg-sky-200/70 ${compact ? "w-14 h-0.5" : "w-20 h-1"}`}
+        />
 
         {/* Joystick Thumbstick Knob */}
         <div
           className={[
-            "relative flex h-14 w-14 items-center justify-center rounded-full border-2 border-white shadow-xl transition-transform duration-75",
+            "relative flex items-center justify-center rounded-full border-2 border-white shadow-xl transition-transform duration-75",
+            compact ? "h-10 w-10" : "h-14 w-14",
             isDragging
               ? "bg-gradient-to-tr from-sky-500 to-indigo-600 text-white scale-105"
               : "bg-gradient-to-tr from-slate-700 to-slate-900 text-white",
@@ -518,8 +555,12 @@ function GameSteerJoystick({
             transform: `translate3d(${knobPos.x}px, 0, 0)`,
           }}
         >
-          <div className="h-6 w-6 rounded-full border border-white/40 bg-white/20 flex items-center justify-center">
-            <div className="h-2 w-2 rounded-full bg-white" />
+          <div
+            className={`rounded-full border border-white/40 bg-white/20 flex items-center justify-center ${compact ? "h-4 w-4" : "h-6 w-6"}`}
+          >
+            <div
+              className={`${compact ? "h-1.5 w-1.5" : "h-2 w-2"} rounded-full bg-white`}
+            />
           </div>
         </div>
       </div>
@@ -748,7 +789,7 @@ export default function BotPage() {
           1. MOBILE / SMALL SCREEN VIEW (FULLSCREEN GAME HUD)
           Visible on screens < lg (phones & tablets)
          =================================================== */}
-      <main className="lg:hidden relative h-screen w-screen overflow-hidden bg-slate-900 text-slate-800 select-none touch-none">
+      <main className="mobile-control-hud lg:hidden relative h-screen w-screen overflow-hidden bg-slate-900 text-slate-800 select-none touch-none">
         {/* Fullscreen Camera Stream Background */}
         <CameraBg frame={cameraFrame} cameraConnected={cameraConnected} />
 
@@ -815,16 +856,18 @@ export default function BotPage() {
             <CameraEyeController
               disabled={controlDisabled}
               onServoCamera={sendServoCamera}
+              compact
             />
           </div>
 
           {/* BOTTOM GAME CONTROLS BAR */}
-          <footer className="pointer-events-auto flex items-end justify-between gap-2 pb-1">
+          <footer className="mobile-control-footer pointer-events-auto flex items-end justify-between gap-2 pb-1">
             {/* BOTTOM LEFT: DRIVE THROTTLE + HORN BUTTON */}
             <div className="flex items-end gap-2">
               <GameDriveJoystick
                 disabled={controlDisabled}
                 onMove={sendMovement}
+                compact
               />
 
               {/* HORN BUTTON */}
@@ -836,10 +879,10 @@ export default function BotPage() {
                   e.preventDefault();
                   sendHorn(1);
                 }}
-                className="flex h-16 w-16 flex-col items-center justify-center rounded-3xl border-2 border-amber-300 bg-amber-50/90 text-amber-700 shadow-xl font-bold transition active:scale-90 hover:bg-amber-100 disabled:opacity-40 backdrop-blur-md"
+                className="mobile-action-button flex h-16 w-16 flex-col items-center justify-center rounded-3xl border-2 border-amber-300 bg-amber-50/90 text-amber-700 shadow-xl font-bold transition active:scale-90 hover:bg-amber-100 disabled:opacity-40 backdrop-blur-md"
                 title="Sound Horn"
               >
-                <Volume2 size={24} className="text-amber-600" />
+                <Volume2 size={18} className="text-amber-600" />
                 <span className="text-[9px] font-extrabold uppercase mt-0.5">
                   Horn
                 </span>
@@ -847,7 +890,7 @@ export default function BotPage() {
             </div>
 
             {/* BOTTOM CENTER: TELEMETRY FLOATING PILLS */}
-            <div className="hidden sm:flex items-center gap-2 bg-white/80 p-2 rounded-3xl border border-slate-200/80 shadow-lg backdrop-blur-md">
+            <div className="mobile-telemetry hidden sm:flex items-center gap-2 bg-white/80 p-2 rounded-3xl border border-slate-200/80 shadow-lg backdrop-blur-md">
               <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 px-2 py-1 bg-slate-50 rounded-xl border border-slate-200/60">
                 <Battery size={14} className="text-emerald-600" />
                 <span>
@@ -893,7 +936,7 @@ export default function BotPage() {
                   sendSpray(nextState);
                 }}
                 className={[
-                  "flex h-16 w-16 flex-col items-center justify-center rounded-3xl border-2 font-bold shadow-xl transition active:scale-90 disabled:opacity-40 backdrop-blur-md",
+                  "mobile-action-button flex h-16 w-16 flex-col items-center justify-center rounded-3xl border-2 font-bold shadow-xl transition active:scale-90 disabled:opacity-40 backdrop-blur-md",
                   sprayOn
                     ? "border-teal-400 bg-teal-100/90 text-teal-700 shadow-teal-200 animate-pulse"
                     : "border-slate-200 bg-white/90 text-slate-600 hover:bg-white",
@@ -901,7 +944,7 @@ export default function BotPage() {
                 title="Toggle Spray Servo"
               >
                 <Droplets
-                  size={24}
+                  size={18}
                   className={sprayOn ? "text-teal-600" : "text-slate-400"}
                 />
                 <span className="text-[9px] font-extrabold uppercase mt-0.5">
@@ -915,7 +958,7 @@ export default function BotPage() {
                 disabled={controlDisabled}
                 onClick={() => setShowWaterPanel((prev) => !prev)}
                 className={[
-                  "flex h-16 w-16 flex-col items-center justify-center rounded-3xl border-2 font-bold shadow-xl transition active:scale-90 disabled:opacity-40 backdrop-blur-md",
+                  "mobile-action-button flex h-16 w-16 flex-col items-center justify-center rounded-3xl border-2 font-bold shadow-xl transition active:scale-90 disabled:opacity-40 backdrop-blur-md",
                   showWaterPanel || refillOn || waterSprayOn
                     ? "border-cyan-400 bg-cyan-100/90 text-cyan-700 shadow-cyan-200"
                     : "border-slate-200 bg-white/90 text-slate-600 hover:bg-white",
@@ -923,7 +966,7 @@ export default function BotPage() {
                 title="Water Pump Control Panel"
               >
                 <Waves
-                  size={24}
+                  size={18}
                   className={
                     refillOn || waterSprayOn
                       ? "text-cyan-600"
@@ -939,13 +982,14 @@ export default function BotPage() {
               <GameSteerJoystick
                 disabled={controlDisabled}
                 onMove={sendMovement}
+                compact
               />
             </div>
           </footer>
 
           {/* FLOATING WATER PUMP CONTROL CARD POPUP */}
           {showWaterPanel && (
-            <div className="pointer-events-auto absolute bottom-24 right-4 z-50 w-72 sm:w-80 shadow-2xl rounded-3xl border border-slate-200 bg-white/95 p-2 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4">
+            <div className="mobile-water-panel pointer-events-auto absolute bottom-24 right-4 z-50 w-72 sm:w-80 shadow-2xl rounded-3xl border border-slate-200 bg-white/95 p-2 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4">
               <div className="flex items-center justify-between px-3 py-1 border-b border-slate-100 pb-2 mb-2">
                 <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                   <Waves size={16} className="text-cyan-600" />

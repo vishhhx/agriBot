@@ -128,3 +128,86 @@
     @apply font-sans;
   }
 }
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .mobile-control-hud {
+    overflow: hidden;
+  }
+
+  .mobile-control-hud > .pointer-events-none {
+    padding: 0.375rem;
+  }
+
+  .mobile-control-hud header {
+    gap: 0.25rem;
+  }
+
+  .mobile-control-hud header a {
+    height: 2rem;
+    width: 2rem;
+  }
+
+  .mobile-control-hud header a svg {
+    height: 0.875rem;
+    width: 0.875rem;
+  }
+
+  .mobile-control-hud header > div > div {
+    padding: 0.375rem 0.5rem;
+  }
+
+  .mobile-control-hud header > div:last-child {
+    transform: scale(0.78);
+    transform-origin: top right;
+  }
+
+  .mobile-control-footer {
+    gap: 0.25rem;
+    padding-bottom: 0;
+  }
+
+  .mobile-telemetry {
+    display: none;
+  }
+
+  .mobile-action-button {
+    height: 3rem !important;
+    width: 3rem !important;
+    border-radius: 1rem !important;
+  }
+
+  .mobile-action-button span {
+    font-size: 0.5rem;
+    line-height: 0.625rem;
+  }
+
+  .mobile-water-panel {
+    bottom: 3.5rem;
+    right: 0.375rem;
+    max-height: calc(100dvh - 4.25rem);
+    overflow-y: auto;
+    width: min(19rem, calc(100vw - 0.75rem));
+  }
+
+  .mobile-water-panel #water-pump-controller {
+    gap: 0.5rem;
+    padding: 0.625rem;
+  }
+
+  .mobile-water-panel #water-pump-controller > div:nth-child(2) {
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+
+  .mobile-water-panel
+    #water-pump-controller
+    > div:nth-child(2)
+    > div:first-child {
+    height: 3.5rem;
+    width: 3.5rem;
+  }
+
+  .mobile-water-panel #water-pump-controller button {
+    padding: 0.5rem 0.625rem;
+  }
+}
