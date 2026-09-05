@@ -24,7 +24,7 @@ const char* WS_PATH       = "/ws";
 // =====================================================
 
 const char* ROBOT_ID      = "robot_prash_001";
-const char* ROBOT_SECRET  = "a8jH2diBDteEx6AL-KiuFeGSBavxbhkaDszHaMrhkuQ";
+const char* ROBOT_SECRET  = "skhtpAftcrkL-ujQK_9-Hxxo9dpeauBuHuSBcQmcQzI";
 
 // =====================================================
 // GLOBAL WEBSOCKET CLIENT & STATE
@@ -54,15 +54,16 @@ Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(PCA9685_ADDRESS);
 #define SERVO_MIN_PULSE 500
 #define SERVO_MAX_PULSE 2500
 
-// Camera Servo Limits & Step (Pan: 360°, Tilt: 180°)
+// Camera limits: pan 0..360°, tilt -60°..90° around the centered 0° position.
 #define CAMERA_STEP 10
 #define PAN_MIN_ANGLE 0
 #define PAN_MAX_ANGLE 360
-#define TILT_MIN_ANGLE 0
-#define TILT_MAX_ANGLE 180
+#define TILT_MIN_ANGLE -60
+#define TILT_MAX_ANGLE 90
+#define TILT_SERVO_CENTER 60
 
 int panAngle = 180;
-int tiltAngle = 90;
+int tiltAngle = 0;
 
 // Spray Servo Angles
 #define SPRAY_OFF_ANGLE 0
@@ -90,6 +91,7 @@ void sprayOn();
 void sprayOff();
 uint16_t angleToPulse(int angle, int maxAngle = 180);
 void setServoAngle(uint8_t channel, int angle, int maxAngle = 180);
+void setTiltAngle(int angle);
 
 // =====================================================
 // WIFI CONNECTION
@@ -160,10 +162,10 @@ void setServoAngle(uint8_t channel, int angle, int maxAngle) {
 
 void centerCamera() {
   panAngle = 180;
-  tiltAngle = 90;
+  tiltAngle = 0;
   setServoAngle(PAN_SERVO_CHANNEL, panAngle, 360);
-  setServoAngle(TILT_SERVO_CHANNEL, tiltAngle, 180);
-  Serial.println("[CAMERA] CENTER (180°/360°, 90°/180°)");
+  setTiltAngle(tiltAngle);
+  Serial.println("[CAMERA] CENTER (PAN 180°/360°, TILT 0°)");
 }
 
 void cameraLeft() {
@@ -182,14 +184,14 @@ void cameraRight() {
 
 void cameraUp() {
   tiltAngle = constrain(tiltAngle + CAMERA_STEP, TILT_MIN_ANGLE, TILT_MAX_ANGLE);
-  setServoAngle(TILT_SERVO_CHANNEL, tiltAngle, 180);
+  setTiltAngle(tiltAngle);
   Serial.print("[CAMERA] UP -> ");
   Serial.println(tiltAngle);
 }
 
 void cameraDown() {
   tiltAngle = constrain(tiltAngle - CAMERA_STEP, TILT_MIN_ANGLE, TILT_MAX_ANGLE);
-  setServoAngle(TILT_SERVO_CHANNEL, tiltAngle, 180);
+  setTiltAngle(tiltAngle);
   Serial.print("[CAMERA] DOWN -> ");
   Serial.println(tiltAngle);
 }
@@ -214,6 +216,11 @@ void sprayOff() {
   sendServoEvent("SPRAY_OFF");
 }
 
+void setTiltAngle(int angle) {
+  tiltAngle = constrain(angle, TILT_MIN_ANGLE, TILT_MAX_ANGLE);
+  setServoAngle(TILT_SERVO_CHANNEL, tiltAngle + TILT_SERVO_CENTER, 180);
+}
+
 // =====================================================
 // CAMERA COMMAND DISPATCHER
 // =====================================================
@@ -234,16 +241,14 @@ void handleCameraCommand(const char* command, int angle) {
   Serial.println();
 
   if (strcasecmp(command, "UP") == 0) {
-    if (angle >= 0) {
-      tiltAngle = constrain(angle, TILT_MIN_ANGLE, TILT_MAX_ANGLE);
-      setServoAngle(TILT_SERVO_CHANNEL, tiltAngle);
+    if (angle != -1) {
+      setTiltAngle(angle);
     } else {
       cameraUp();
     }
   } else if (strcasecmp(command, "DOWN") == 0) {
-    if (angle >= 0) {
-      tiltAngle = constrain(angle, TILT_MIN_ANGLE, TILT_MAX_ANGLE);
-      setServoAngle(TILT_SERVO_CHANNEL, tiltAngle);
+    if (angle != -1) {
+      setTiltAngle(angle);
     } else {
       cameraDown();
     }
@@ -266,9 +271,8 @@ void handleCameraCommand(const char* command, int angle) {
   } else if (strcasecmp(command, "PAN") == 0 && angle >= 0) {
     panAngle = constrain(angle, PAN_MIN_ANGLE, PAN_MAX_ANGLE);
     setServoAngle(PAN_SERVO_CHANNEL, panAngle);
-  } else if (strcasecmp(command, "TILT") == 0 && angle >= 0) {
-    tiltAngle = constrain(angle, TILT_MIN_ANGLE, TILT_MAX_ANGLE);
-    setServoAngle(TILT_SERVO_CHANNEL, tiltAngle);
+  } else if (strcasecmp(command, "TILT") == 0 && angle != -1) {
+    setTiltAngle(angle);
   } else {
     Serial.print("[SERVO] Unknown camera command: ");
     Serial.println(command);
@@ -458,7 +462,7 @@ void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
 
       {
         JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, payload, length);
+        DeserializationError error = deserializeJson(doc, (const char*)payload, length);
         if (error) {
           Serial.print("[JSON ERROR] ");
           Serial.println(error.c_str());

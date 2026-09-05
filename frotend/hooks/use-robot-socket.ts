@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { robotSocket } from "@/lib/robot-socket";
 import type {
@@ -15,6 +15,7 @@ import type {
 export type Telemetry = {
   battery?: number;
   speed?: number;
+  rpm?: number;
   temperature?: number;
   latitude?: number;
   longitude?: number;
@@ -29,6 +30,8 @@ export function useRobotSocket(
   const [connected, setConnected] = useState(robotSocket.connected);
   const [status, setStatus] = useState<RobotStatus | null>(null);
   const [telemetry, setTelemetry] = useState<Telemetry | null>(null);
+  const [cameraFrame, setCameraFrame] = useState<string | null>(null);
+  const prevFrameUrl = useRef<string | null>(null);
 
   // ESP Role status state
   const [movementConnected, setMovementConnected] = useState(false);
@@ -48,12 +51,7 @@ export function useRobotSocket(
   const rolesKey = useMemo(() => roles.join("|"), [roles]);
 
   useEffect(() => {
-    console.log(
-      "[useRobotSocket] mount robotId=",
-      robotId,
-      "roles=",
-      rolesKey,
-    );
+    console.log("[useRobotSocket] mount robotId=", robotId, "roles=", rolesKey);
 
     robotSocket.connect();
 
@@ -98,7 +96,11 @@ export function useRobotSocket(
           break;
 
         case "robot:command:rejected":
-          console.warn("[FRONTEND WS IN] Command rejected:", event.reason, event);
+          console.warn(
+            "[FRONTEND WS IN] Command rejected:",
+            event.reason,
+            event,
+          );
           break;
 
         case "servo:event":
@@ -138,8 +140,10 @@ export function useRobotSocket(
             setWaterSprayOn(event.sprayPump);
             setTankFull(event.tankFull);
             setWaterDistanceCm(event.waterDistanceCm);
-            if (event.waterPercent !== undefined) setWaterPercent(event.waterPercent);
-            if (event.sensorPresent !== undefined) setSensorPresent(event.sensorPresent);
+            if (event.waterPercent !== undefined)
+              setWaterPercent(event.waterPercent);
+            if (event.sensorPresent !== undefined)
+              setSensorPresent(event.sensorPresent);
             console.log(
               `[useRobotSocket] water:event event=${event.event}`,
               `refill=${event.refillPump}`,
@@ -153,6 +157,13 @@ export function useRobotSocket(
           break;
 
         case "water:accepted":
+          if (event.robotId === robotId) {
+            if (event.command === "REFILL") {
+              setRefillOn(event.state === "ON");
+            } else if (event.command === "SPRAY") {
+              setWaterSprayOn(event.state === "ON");
+            }
+          }
           console.log("[useRobotSocket] water:accepted", event);
           break;
 
@@ -165,28 +176,33 @@ export function useRobotSocket(
       }
     });
 
-    // Binary JPEG frames  (disabled — uncomment to enable)
-    // const removeBinaryListener = robotSocket.onBinaryFrame((blob) => {
-    //   const url = URL.createObjectURL(blob);
-    //   setCameraFrame(url);
-    //   if (prevFrameUrl.current) URL.revokeObjectURL(prevFrameUrl.current);
-    //   prevFrameUrl.current = url;
-    // });
+    // Binary JPEG frames
+    const removeBinaryListener = robotSocket.onBinaryFrame((blob) => {
+      const url = URL.createObjectURL(blob);
+      setCameraFrame(url);
+      if (prevFrameUrl.current) URL.revokeObjectURL(prevFrameUrl.current);
+      prevFrameUrl.current = url;
+    });
 
-    console.log("[useRobotSocket] subscribing robotId=", robotId, "roles=", rolesKey.split("|"));
+    console.log(
+      "[useRobotSocket] subscribing robotId=",
+      robotId,
+      "roles=",
+      rolesKey.split("|"),
+    );
     robotSocket.subscribe(robotId, rolesKey.split("|") as BotRole[]);
 
     return () => {
       removeConnectionListener();
       removeEventListener();
-      // removeBinaryListener();
+      removeBinaryListener();
       robotSocket.unsubscribe(robotId);
 
       // Cleanup any lingering blob URL.
-      // if (prevFrameUrl.current) {
-      //   URL.revokeObjectURL(prevFrameUrl.current);
-      //   prevFrameUrl.current = null;
-      // }
+      if (prevFrameUrl.current) {
+        URL.revokeObjectURL(prevFrameUrl.current);
+        prevFrameUrl.current = null;
+      }
     };
   }, [robotId, rolesKey]);
 
@@ -230,7 +246,9 @@ export function useRobotSocket(
       if (sent) {
         console.log("[FRONTEND WS SENT]");
       } else {
-        console.error("[FRONTEND MOVEMENT ERROR] Failed to send WebSocket message");
+        console.error(
+          "[FRONTEND MOVEMENT ERROR] Failed to send WebSocket message",
+        );
       }
 
       return sent;
@@ -319,7 +337,10 @@ export function useRobotSocket(
       }
 
       if (wsState !== WebSocket.OPEN) {
-        console.error("[WATER REFILL] WebSocket is not OPEN, readyState=", wsState);
+        console.error(
+          "[WATER REFILL] WebSocket is not OPEN, readyState=",
+          wsState,
+        );
         return;
       }
 
@@ -341,7 +362,12 @@ export function useRobotSocket(
     (state: WaterPumpState) => {
       const wsState = robotSocket.socketReadyState;
       if (wsState === null || wsState !== WebSocket.OPEN) return;
-      const message = { type: "water:spray" as const, robotId, state, requestId: crypto.randomUUID() };
+      const message = {
+        type: "water:spray" as const,
+        robotId,
+        state,
+        requestId: crypto.randomUUID(),
+      };
       robotSocket.sendWaterSprayCommand(message);
     },
     [robotId],
@@ -379,7 +405,7 @@ export function useRobotSocket(
     espRoles,
     movementConnected,
     cameraConnected,
-    cameraFrame: null,
+    cameraFrame,
     servoConnected,
     sprayOn,
     sendMovement,

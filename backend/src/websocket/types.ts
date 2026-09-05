@@ -4,7 +4,14 @@ import { type BotRole } from "./state";
 // SERVO TYPES
 // =====================================================
 
-export type CameraServoCommand = "LEFT" | "RIGHT" | "UP" | "DOWN" | "CENTER";
+export type CameraServoCommand =
+  | "LEFT"
+  | "RIGHT"
+  | "UP"
+  | "DOWN"
+  | "CENTER"
+  | "PAN"
+  | "TILT";
 
 export type SprayCommand = "ON" | "OFF";
 
@@ -25,7 +32,6 @@ export type WaterEventName =
   | "SENSOR_DISCONNECTED";
 
 export type Message =
-
   | {
       type: "robot:register";
       client: "robot";
@@ -33,19 +39,15 @@ export type Message =
       secret: string;
       roles: BotRole[];
     }
-
   | {
       type: "robot:subscribe";
       robotId: string;
       roles: BotRole[];
     }
-
   | {
       type: "robot:unsubscribe";
       robotId: string;
     }
-
-
   | {
       type: "robot:movement";
       robotId: string;
@@ -54,7 +56,6 @@ export type Message =
       speed: number;
       requestId: string;
     }
-
   | {
       type: "robot:telemetry";
       robotId: string;
@@ -67,28 +68,22 @@ export type Message =
         longitude?: number;
       };
     }
-
-
   | {
       type: "robot:status";
       robotId: string;
       role?: BotRole;
       status: "online" | "offline" | "idle" | "busy" | "maintenance";
     }
-
   | {
       type: "movement:status";
       robotId: string;
       connected: boolean;
     }
-
   | {
       type: "servo:status";
       robotId: string;
       connected: boolean;
     }
-
-
   | {
       type: "camera:event";
       robotId: string;
@@ -100,7 +95,6 @@ export type Message =
         | "CAMERA_ERROR";
       payload?: unknown;
     }
-
   | {
       type: "BOT_COMMAND";
       data: {
@@ -109,8 +103,6 @@ export type Message =
         payload: unknown;
       };
     }
-
-
   | {
       type: "BOT_EVENT";
       data: {
@@ -149,12 +141,7 @@ export type Message =
   | {
       type: "servo:event";
       robotId: string;
-      event:
-        | "READY"
-        | "CAMERA_MOVED"
-        | "SPRAY_ON"
-        | "SPRAY_OFF"
-        | "ERROR";
+      event: "READY" | "CAMERA_MOVED" | "SPRAY_ON" | "SPRAY_OFF" | "ERROR";
       payload?: unknown;
     }
 
@@ -206,8 +193,6 @@ export type Message =
       beeps?: number;
       requestId?: string;
     };
-
-
 
 export type ConnectionInfo =
   | {

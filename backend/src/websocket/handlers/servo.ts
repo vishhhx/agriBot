@@ -3,7 +3,11 @@ import { WebSocket } from "ws";
 import { connections } from "../connections";
 import { robots } from "../state";
 import { send } from "../connections";
-import { type Message, type CameraServoCommand, type SprayCommand } from "../types";
+import {
+  type Message,
+  type CameraServoCommand,
+  type SprayCommand,
+} from "../types";
 
 // =====================================================
 // CAMERA SERVO COMMAND
@@ -34,7 +38,9 @@ export function handleCameraServoCommand(
 
   if (!connection.robotIds.has(message.robotId)) {
     const reason = "Robot subscription is required";
-    console.warn(`[SERVO REJECTED] reason=${reason} user=${connection.userId} robot=${message.robotId}`);
+    console.warn(
+      `[SERVO REJECTED] reason=${reason} user=${connection.userId} robot=${message.robotId}`,
+    );
     send(ws, {
       type: "servo:rejected",
       robotId: message.robotId,
@@ -53,7 +59,9 @@ export function handleCameraServoCommand(
 
   if (!roles?.has("SERVO")) {
     const reason = "SERVO role is not subscribed";
-    console.warn(`[SERVO REJECTED] reason=${reason} user=${connection.userId} robot=${message.robotId} storedRoles=${roles ? [...roles].join(",") : "none"}`);
+    console.warn(
+      `[SERVO REJECTED] reason=${reason} user=${connection.userId} robot=${message.robotId} storedRoles=${roles ? [...roles].join(",") : "none"}`,
+    );
     send(ws, {
       type: "servo:rejected",
       robotId: message.robotId,
@@ -89,7 +97,9 @@ export function handleCameraServoCommand(
 
   if (!servoBot) {
     const reason = "Servo module is not connected";
-    console.warn(`[SERVO REJECTED] reason=${reason} robot=${message.robotId} bots=${[...robot.bots.keys()].join(",")||"none"}`);
+    console.warn(
+      `[SERVO REJECTED] reason=${reason} robot=${message.robotId} bots=${[...robot.bots.keys()].join(",") || "none"}`,
+    );
     send(ws, {
       type: "servo:rejected",
       robotId: message.robotId,
@@ -104,17 +114,24 @@ export function handleCameraServoCommand(
   // VALIDATE ANGLE
   // ---------------------------------------------------
 
+  const angleLimits =
+    message.command === "PAN"
+      ? { min: 0, max: 360 }
+      : message.command === "TILT"
+        ? { min: -60, max: 90 }
+        : { min: 0, max: 180 };
+
   if (
     message.angle !== undefined &&
     (!Number.isFinite(message.angle) ||
-      message.angle < 0 ||
-      message.angle > 180)
+      message.angle < angleLimits.min ||
+      message.angle > angleLimits.max)
   ) {
     send(ws, {
       type: "servo:rejected",
       robotId: message.robotId,
       requestId: message.requestId,
-      reason: "Servo angle must be between 0 and 180",
+      reason: `Servo ${message.command} angle must be between ${angleLimits.min} and ${angleLimits.max}`,
     });
 
     return;
@@ -247,7 +264,9 @@ export function handleSprayServoCommand(
 
   if (!servoBot) {
     const reason = "Servo module is not connected";
-    console.warn(`[SPRAY REJECTED] reason=${reason} robot=${message.robotId} bots=${[...robot.bots.keys()].join(",")||"none"}`);
+    console.warn(
+      `[SPRAY REJECTED] reason=${reason} robot=${message.robotId} bots=${[...robot.bots.keys()].join(",") || "none"}`,
+    );
     send(ws, {
       type: "servo:rejected",
       robotId: message.robotId,

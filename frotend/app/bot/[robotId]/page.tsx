@@ -51,12 +51,7 @@ import type {
 // TYPES
 // =====================================================
 
-type BotStatus =
-  | "online"
-  | "offline"
-  | "idle"
-  | "busy"
-  | "maintenance";
+type BotStatus = "online" | "offline" | "idle" | "busy" | "maintenance";
 
 interface BotDetails {
   robotId: string;
@@ -72,11 +67,7 @@ interface BotDetails {
 
   status: BotStatus;
 
-  role:
-    | "owner"
-    | "operator"
-    | "viewer"
-    | "technician";
+  role: "owner" | "operator" | "viewer" | "technician";
 }
 
 const STATUS_COLOR: Record<BotStatus, string> = {
@@ -153,23 +144,14 @@ function CameraEyeController({
   onServoCamera,
 }: {
   disabled: boolean;
-  onServoCamera: (command: CameraServoCommand) => void;
+  onServoCamera: (command: CameraServoCommand, angle?: number) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [pupilPos, setPupilPos] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
-  const lastCmdRef = useRef<CameraServoCommand | null>(null);
-
-  const triggerServo = useCallback(
-    (cmd: CameraServoCommand) => {
-      if (disabled) return;
-      if (lastCmdRef.current !== cmd) {
-        lastCmdRef.current = cmd;
-        onServoCamera(cmd);
-      }
-    },
-    [disabled, onServoCamera],
-  );
+  const animationFrameRef = useRef<number | null>(null);
+  const pendingAnglesRef = useRef<{ pan: number; tilt: number } | null>(null);
+  const lastAnglesRef = useRef<{ pan: number; tilt: number } | null>(null);
 
   const processOffset = useCallback(
     (offsetX: number, offsetY: number, maxRadius: number) => {
@@ -181,15 +163,33 @@ function CameraEyeController({
       const py = Math.sin(angle) * clampedDist;
       setPupilPos({ x: px, y: py });
 
-      if (dist < 15) {
-        triggerServo("CENTER");
-      } else if (Math.abs(offsetX) > Math.abs(offsetY)) {
-        triggerServo(offsetX > 0 ? "RIGHT" : "LEFT");
-      } else {
-        triggerServo(offsetY > 0 ? "DOWN" : "UP");
+      const pan = Math.round(((px + maxRadius) / (maxRadius * 2)) * 360);
+      const tilt = Math.round(
+        py < 0 ? (-py / maxRadius) * 90 : -(py / maxRadius) * 60,
+      );
+      pendingAnglesRef.current = {
+        pan: Math.max(0, Math.min(360, pan)),
+        tilt: Math.max(-60, Math.min(90, tilt)),
+      };
+
+      if (animationFrameRef.current === null) {
+        animationFrameRef.current = requestAnimationFrame(() => {
+          animationFrameRef.current = null;
+          const pending = pendingAnglesRef.current;
+          if (!pending || disabled) return;
+
+          const previous = lastAnglesRef.current;
+          if (!previous || previous.pan !== pending.pan) {
+            onServoCamera("PAN", pending.pan);
+          }
+          if (!previous || previous.tilt !== pending.tilt) {
+            onServoCamera("TILT", pending.tilt);
+          }
+          lastAnglesRef.current = pending;
+        });
       }
     },
-    [triggerServo],
+    [disabled, onServoCamera],
   );
 
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -201,7 +201,11 @@ function CameraEyeController({
     const rect = containerRef.current.getBoundingClientRect();
     const cx = rect.width / 2;
     const cy = rect.height / 2;
-    processOffset(e.clientX - rect.left - cx, e.clientY - rect.top - cy, cx - 18);
+    processOffset(
+      e.clientX - rect.left - cx,
+      e.clientY - rect.top - cy,
+      cx - 18,
+    );
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
@@ -209,13 +213,18 @@ function CameraEyeController({
     const rect = containerRef.current.getBoundingClientRect();
     const cx = rect.width / 2;
     const cy = rect.height / 2;
-    processOffset(e.clientX - rect.left - cx, e.clientY - rect.top - cy, cx - 18);
+    processOffset(
+      e.clientX - rect.left - cx,
+      e.clientY - rect.top - cy,
+      cx - 18,
+    );
   };
 
   const handlePointerUp = () => {
     setIsDragging(false);
     setPupilPos({ x: 0, y: 0 });
-    lastCmdRef.current = null;
+    pendingAnglesRef.current = null;
+    lastAnglesRef.current = null;
   };
 
   return (
@@ -548,7 +557,10 @@ function EspStatusBadge({
           connected ? "bg-emerald-500 animate-pulse" : "bg-slate-300"
         }`}
       />
-      <Icon size={12} className={connected ? "text-emerald-600" : "text-slate-400"} />
+      <Icon
+        size={12}
+        className={connected ? "text-emerald-600" : "text-slate-400"}
+      />
       <span>{label}</span>
     </div>
   );
@@ -611,7 +623,8 @@ export default function BotPage() {
       if (e.repeat || e.target instanceof HTMLInputElement) return;
       const k = e.key.toLowerCase();
       if (k === "w" || e.key === "ArrowUp") sendMovement("FORWARD", 100);
-      else if (k === "s" || e.key === "ArrowDown") sendMovement("BACKWARD", 100);
+      else if (k === "s" || e.key === "ArrowDown")
+        sendMovement("BACKWARD", 100);
       else if (k === "a" || e.key === "ArrowLeft") sendMovement("LEFT", 100);
       else if (k === "d" || e.key === "ArrowRight") sendMovement("RIGHT", 100);
       else if (e.key === " ") sendMovement("STOP", 0);
@@ -620,7 +633,18 @@ export default function BotPage() {
 
     const handleKeyUp = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
-      if (["w", "s", "a", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(k)) {
+      if (
+        [
+          "w",
+          "s",
+          "a",
+          "d",
+          "arrowup",
+          "arrowdown",
+          "arrowleft",
+          "arrowright",
+        ].includes(k)
+      ) {
         sendMovement("STOP", 0);
       }
     };
@@ -653,8 +677,8 @@ export default function BotPage() {
         isAxiosError(err)
           ? err.response?.data?.message || "Unable to load this bot."
           : err instanceof Error
-          ? err.message
-          : "Unable to load this bot.",
+            ? err.message
+            : "Unable to load this bot.",
       );
     } finally {
       setLoading(false);
@@ -671,18 +695,21 @@ export default function BotPage() {
   const resolvedStatus: BotStatus = isBotStatus(liveStatus)
     ? liveStatus
     : isBotStatus(bot?.status)
-    ? bot!.status
-    : "offline";
+      ? bot!.status
+      : "offline";
 
   const canControl = bot?.role === "owner" || bot?.role === "operator";
-  const controlDisabled = !gatewayConnected || resolvedStatus === "offline" || !canControl;
+  const controlDisabled =
+    !gatewayConnected || resolvedStatus === "offline" || !canControl;
 
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-4">
           <div className="h-12 w-12 animate-spin rounded-full border-3 border-emerald-500 border-t-transparent shadow-sm" />
-          <p className="text-sm font-semibold text-slate-600">Loading AgriBot Controls…</p>
+          <p className="text-sm font-semibold text-slate-600">
+            Loading AgriBot Controls…
+          </p>
         </div>
       </main>
     );
@@ -692,8 +719,12 @@ export default function BotPage() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50 px-6">
         <section className="w-full max-w-md rounded-3xl border border-rose-200 bg-white p-8 shadow-xl">
-          <h1 className="text-lg font-bold text-slate-800">Robot unavailable</h1>
-          <p className="mt-2 text-sm text-slate-500">{error || "This robot could not be found."}</p>
+          <h1 className="text-lg font-bold text-slate-800">
+            Robot unavailable
+          </h1>
+          <p className="mt-2 text-sm text-slate-500">
+            {error || "This robot could not be found."}
+          </p>
           <Link
             href="/dashboard/mybots"
             className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-emerald-600 hover:text-emerald-500"
@@ -707,189 +738,526 @@ export default function BotPage() {
   }
 
   const movementEspConnected =
-    espRoles.MOVEMENT_AND_OTHER || movementConnected || (gatewayConnected && resolvedStatus === "online");
+    espRoles.MOVEMENT_AND_OTHER ||
+    movementConnected ||
+    (gatewayConnected && resolvedStatus === "online");
 
   return (
-    <main className="relative h-screen w-screen overflow-hidden bg-slate-100 text-slate-800 select-none">
-      {/* Camera Stream Background */}
-      <CameraBg frame={cameraFrame} cameraConnected={cameraConnected} />
+    <>
+      {/* ===================================================
+          1. MOBILE / SMALL SCREEN VIEW (FULLSCREEN GAME HUD)
+          Visible on screens < lg (phones & tablets)
+         =================================================== */}
+      <main className="lg:hidden relative h-screen w-screen overflow-hidden bg-slate-900 text-slate-800 select-none touch-none">
+        {/* Fullscreen Camera Stream Background */}
+        <CameraBg frame={cameraFrame} cameraConnected={cameraConnected} />
 
-      {/* Main HUD overlay */}
-      <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-3 sm:p-4">
-        
-        {/* ===================================================
-            TOP BAR: HEADER & ESP STATUS BADGES
-           =================================================== */}
-        <header className="pointer-events-auto flex flex-wrap items-center justify-between gap-2">
-          {/* Left: Back Button & Bot Identity */}
-          <div className="flex items-center gap-2">
-            <Link
-              href="/dashboard/mybots"
-              className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/90 text-slate-700 shadow-md backdrop-blur-md transition hover:bg-white"
-              title="Back to Bots"
-            >
-              <ArrowLeft size={18} />
-            </Link>
+        {/* Floating Game HUD Overlay */}
+        <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-3">
+          {/* TOP BAR: HEADER & ESP STATUS BADGES */}
+          <header className="pointer-events-auto flex flex-wrap items-center justify-between gap-2">
+            {/* Left: Back Button & Bot Identity */}
+            <div className="flex items-center gap-2">
+              <Link
+                href="/dashboard/mybots"
+                className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/90 text-slate-700 shadow-md backdrop-blur-md transition hover:bg-white"
+                title="Back to Bots"
+              >
+                <ArrowLeft size={18} />
+              </Link>
 
-            <div className="flex items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/90 px-3.5 py-2 shadow-md backdrop-blur-md">
-              <span className={`h-2.5 w-2.5 rounded-full ${STATUS_DOT[resolvedStatus]}`} />
-              <span className="text-xs font-bold text-slate-800">{bot.name}</span>
-              <span className={`text-[10px] font-extrabold uppercase ${STATUS_COLOR[resolvedStatus]}`}>
-                {resolvedStatus}
-              </span>
+              <div className="flex items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/90 px-3 py-2 shadow-md backdrop-blur-md">
+                <span
+                  className={`h-2.5 w-2.5 rounded-full ${STATUS_DOT[resolvedStatus]}`}
+                />
+                <span className="text-xs font-bold text-slate-800">
+                  {bot.name}
+                </span>
+                <span
+                  className={`text-[10px] font-extrabold uppercase ${STATUS_COLOR[resolvedStatus]}`}
+                >
+                  {resolvedStatus}
+                </span>
+              </div>
             </div>
+
+            {/* Right: All ESP Roles Indicators */}
+            <div className="flex flex-wrap items-center gap-1 bg-white/80 p-1 rounded-2xl border border-slate-200/80 shadow-md backdrop-blur-md scale-90 sm:scale-100 origin-right">
+              <EspStatusBadge
+                label="Movement"
+                roleName="MOVEMENT_AND_OTHER"
+                connected={movementEspConnected}
+                icon={Cpu}
+              />
+              <EspStatusBadge
+                label="Water"
+                roleName="WATER_PUMP"
+                connected={espRoles.WATER_PUMP}
+                icon={Waves}
+              />
+              <EspStatusBadge
+                label="Camera"
+                roleName="CAMERA"
+                connected={espRoles.CAMERA}
+                icon={Video}
+              />
+              <EspStatusBadge
+                label="Servo"
+                roleName="SERVO"
+                connected={espRoles.SERVO}
+                icon={Crosshair}
+              />
+            </div>
+          </header>
+
+          {/* TOP CENTER: CAMERA EYE PAN/TILT CONTROLLER */}
+          <div className="pointer-events-auto relative flex flex-1 flex-col items-center justify-start pt-2">
+            <CameraEyeController
+              disabled={controlDisabled}
+              onServoCamera={sendServoCamera}
+            />
           </div>
 
-          {/* Center-Right: All ESP Roles Online Indicators */}
-          <div className="flex flex-wrap items-center gap-1.5 bg-white/80 p-1.5 rounded-2xl border border-slate-200/80 shadow-md backdrop-blur-md">
-            <EspStatusBadge
-              label="Movement ESP"
-              roleName="MOVEMENT_AND_OTHER"
-              connected={movementEspConnected}
-              icon={Cpu}
-            />
-            <EspStatusBadge
-              label="Water ESP"
-              roleName="WATER_PUMP"
-              connected={espRoles.WATER_PUMP}
-              icon={Waves}
-            />
-            <EspStatusBadge
-              label="Camera ESP"
-              roleName="CAMERA"
-              connected={espRoles.CAMERA}
-              icon={Video}
-            />
-            <EspStatusBadge
-              label="Servo ESP"
-              roleName="SERVO"
-              connected={espRoles.SERVO}
-              icon={Crosshair}
-            />
+          {/* BOTTOM GAME CONTROLS BAR */}
+          <footer className="pointer-events-auto flex items-end justify-between gap-2 pb-1">
+            {/* BOTTOM LEFT: DRIVE THROTTLE + HORN BUTTON */}
+            <div className="flex items-end gap-2">
+              <GameDriveJoystick
+                disabled={controlDisabled}
+                onMove={sendMovement}
+              />
+
+              {/* HORN BUTTON */}
+              <button
+                id="horn-btn"
+                type="button"
+                disabled={controlDisabled}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  sendHorn(1);
+                }}
+                className="flex h-16 w-16 flex-col items-center justify-center rounded-3xl border-2 border-amber-300 bg-amber-50/90 text-amber-700 shadow-xl font-bold transition active:scale-90 hover:bg-amber-100 disabled:opacity-40 backdrop-blur-md"
+                title="Sound Horn"
+              >
+                <Volume2 size={24} className="text-amber-600" />
+                <span className="text-[9px] font-extrabold uppercase mt-0.5">
+                  Horn
+                </span>
+              </button>
+            </div>
+
+            {/* BOTTOM CENTER: TELEMETRY FLOATING PILLS */}
+            <div className="hidden sm:flex items-center gap-2 bg-white/80 p-2 rounded-3xl border border-slate-200/80 shadow-lg backdrop-blur-md">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 px-2 py-1 bg-slate-50 rounded-xl border border-slate-200/60">
+                <Battery size={14} className="text-emerald-600" />
+                <span>
+                  {telemetry?.battery !== undefined
+                    ? `${telemetry.battery}%`
+                    : "100%"}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 px-2 py-1 bg-slate-50 rounded-xl border border-slate-200/60">
+                <Gauge size={14} className="text-sky-600" />
+                <span>
+                  {telemetry?.speed !== undefined
+                    ? `${telemetry.speed.toFixed(1)} km/h`
+                    : "0.0 km/h"}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 px-2 py-1 bg-slate-50 rounded-xl border border-slate-200/60">
+                <Cpu size={14} className="text-indigo-600" />
+                <span>
+                  {telemetry?.rpm !== undefined
+                    ? `${telemetry.rpm} RPM`
+                    : "0 RPM"}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 px-2 py-1 bg-slate-50 rounded-xl border border-slate-200/60">
+                <Thermometer size={14} className="text-rose-600" />
+                <span>
+                  {telemetry?.temperature !== undefined
+                    ? `${telemetry.temperature}°C`
+                    : "32°C"}
+                </span>
+              </div>
+            </div>
+
+            {/* BOTTOM RIGHT: STEERING CONTROLLER + SPRAY TOGGLE + WATER PUMP TOGGLE */}
+            <div className="flex items-end gap-2">
+              {/* SPRAY ACTION TOGGLE */}
+              <button
+                type="button"
+                disabled={controlDisabled}
+                onClick={() => {
+                  const nextState = sprayOn ? "OFF" : "ON";
+                  sendSpray(nextState);
+                }}
+                className={[
+                  "flex h-16 w-16 flex-col items-center justify-center rounded-3xl border-2 font-bold shadow-xl transition active:scale-90 disabled:opacity-40 backdrop-blur-md",
+                  sprayOn
+                    ? "border-teal-400 bg-teal-100/90 text-teal-700 shadow-teal-200 animate-pulse"
+                    : "border-slate-200 bg-white/90 text-slate-600 hover:bg-white",
+                ].join(" ")}
+                title="Toggle Spray Servo"
+              >
+                <Droplets
+                  size={24}
+                  className={sprayOn ? "text-teal-600" : "text-slate-400"}
+                />
+                <span className="text-[9px] font-extrabold uppercase mt-0.5">
+                  {sprayOn ? "Spray ON" : "Spray"}
+                </span>
+              </button>
+
+              {/* WATER PUMP DRAWER TOGGLE */}
+              <button
+                type="button"
+                disabled={controlDisabled}
+                onClick={() => setShowWaterPanel((prev) => !prev)}
+                className={[
+                  "flex h-16 w-16 flex-col items-center justify-center rounded-3xl border-2 font-bold shadow-xl transition active:scale-90 disabled:opacity-40 backdrop-blur-md",
+                  showWaterPanel || refillOn || waterSprayOn
+                    ? "border-cyan-400 bg-cyan-100/90 text-cyan-700 shadow-cyan-200"
+                    : "border-slate-200 bg-white/90 text-slate-600 hover:bg-white",
+                ].join(" ")}
+                title="Water Pump Control Panel"
+              >
+                <Waves
+                  size={24}
+                  className={
+                    refillOn || waterSprayOn
+                      ? "text-cyan-600"
+                      : "text-slate-500"
+                  }
+                />
+                <span className="text-[9px] font-extrabold uppercase mt-0.5">
+                  Pump Panel
+                </span>
+              </button>
+
+              {/* STEERING JOYSTICK */}
+              <GameSteerJoystick
+                disabled={controlDisabled}
+                onMove={sendMovement}
+              />
+            </div>
+          </footer>
+
+          {/* FLOATING WATER PUMP CONTROL CARD POPUP */}
+          {showWaterPanel && (
+            <div className="pointer-events-auto absolute bottom-24 right-4 z-50 w-72 sm:w-80 shadow-2xl rounded-3xl border border-slate-200 bg-white/95 p-2 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4">
+              <div className="flex items-center justify-between px-3 py-1 border-b border-slate-100 pb-2 mb-2">
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Waves size={16} className="text-cyan-600" />
+                  Water Pump System
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowWaterPanel(false)}
+                  className="text-xs font-bold text-slate-400 hover:text-slate-600"
+                >
+                  ✕ Close
+                </button>
+              </div>
+              <WaterPumpController
+                disabled={controlDisabled}
+                connected={waterPumpConnected}
+                refillOn={refillOn}
+                sprayOn={waterSprayOn}
+                tankFull={tankFull}
+                waterDistanceCm={waterDistanceCm}
+                waterPercent={waterPercent}
+                sensorPresent={sensorPresent}
+                onRefill={sendWaterRefill}
+                onSpray={sendWaterSpray}
+              />
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* ===================================================
+          2. DESKTOP / LAPTOP VIEW (MINIMALISTIC WHITE DASHBOARD)
+          Visible on screens >= lg (laptops & desktops)
+         =================================================== */}
+      <main className="hidden lg:block min-h-screen w-full bg-slate-50 text-slate-900 select-none pb-10">
+        {/* TOP BAR: HEADER & ESP STATUS BADGES */}
+        <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-4 py-3 shadow-xs">
+          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            {/* Left: Back Button & Bot Identity */}
+            <div className="flex items-center gap-3">
+              <Link
+                href="/dashboard/mybots"
+                className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-slate-100 text-slate-700 shadow-xs hover:bg-slate-200 transition"
+                title="Back to Bots"
+              >
+                <ArrowLeft size={18} />
+              </Link>
+
+              <div className="flex items-center gap-2.5 rounded-2xl border border-slate-200 bg-white px-4 py-2 shadow-xs">
+                <span
+                  className={`h-2.5 w-2.5 rounded-full ${STATUS_DOT[resolvedStatus]}`}
+                />
+                <span className="text-sm font-extrabold text-slate-900">
+                  {bot.name}
+                </span>
+                <span
+                  className={`text-[11px] font-extrabold uppercase tracking-wider ${STATUS_COLOR[resolvedStatus]}`}
+                >
+                  {resolvedStatus}
+                </span>
+              </div>
+            </div>
+
+            {/* Right: All ESP Roles Online Indicators */}
+            <div className="flex flex-wrap items-center gap-1.5 bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200">
+              <EspStatusBadge
+                label="Movement ESP"
+                roleName="MOVEMENT_AND_OTHER"
+                connected={movementEspConnected}
+                icon={Cpu}
+              />
+              <EspStatusBadge
+                label="Water ESP"
+                roleName="WATER_PUMP"
+                connected={espRoles.WATER_PUMP}
+                icon={Waves}
+              />
+              <EspStatusBadge
+                label="Camera ESP"
+                roleName="CAMERA"
+                connected={espRoles.CAMERA}
+                icon={Video}
+              />
+              <EspStatusBadge
+                label="Servo ESP"
+                roleName="SERVO"
+                connected={espRoles.SERVO}
+                icon={Crosshair}
+              />
+            </div>
           </div>
         </header>
 
-        {/* ===================================================
-            MIDDLE VIEWPORT: CAMERA EYE CONTROLLER AT TOP CENTER
-           =================================================== */}
-        <div className="pointer-events-auto relative flex flex-1 flex-col items-center justify-start pt-2">
-          <CameraEyeController
-            disabled={controlDisabled}
-            onServoCamera={sendServoCamera}
-          />
-        </div>
+        {/* MAIN CONTENT GRID */}
+        <div className="max-w-7xl mx-auto p-6 grid grid-cols-12 gap-6">
+          {/* LEFT COLUMN (COL-SPAN 7): MEDIUM SQUARE CAMERA PREVIEW */}
+          <div className="col-span-7 flex flex-col gap-6">
+            {/* CAMERA CARD */}
+            <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-5 flex flex-col gap-4">
+              {/* Camera Header */}
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-xl bg-slate-100 border border-slate-200">
+                    <Video size={16} className="text-slate-700" />
+                  </div>
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+                    Live Camera Feed
+                  </span>
+                </div>
 
-        {/* ===================================================
-            BOTTOM CONTROLS BAR: SPLIT JOYSTICKS, HORN, TELEMETRY, ACTION BUTTONS
-           =================================================== */}
-        <footer className="pointer-events-auto flex items-end justify-between gap-2 pb-1">
-          
-          {/* BOTTOM LEFT: DRIVE THROTTLE + HORN BUTTON */}
-          <div className="flex items-end gap-2">
-            <GameDriveJoystick
-              disabled={controlDisabled}
-              onMove={sendMovement}
-            />
+                <div className="flex items-center gap-2">
+                  {cameraConnected && (
+                    <span className="flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-700">
+                      <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+                      LIVE • QVGA
+                    </span>
+                  )}
+                </div>
+              </div>
 
-            {/* HORN BUTTON */}
-            <button
-              id="horn-btn"
-              type="button"
-              disabled={controlDisabled}
-              onPointerDown={(e) => {
-                e.preventDefault();
-                sendHorn(1);
-              }}
-              className={[
-                "flex h-16 w-16 flex-col items-center justify-center rounded-3xl border-2 border-amber-300 bg-amber-50 text-amber-700 shadow-xl font-bold transition active:scale-90 hover:bg-amber-100 disabled:opacity-40 backdrop-blur-md",
-              ].join(" ")}
-              title="Sound Horn"
-            >
-              <Volume2 size={24} className="text-amber-600" />
-              <span className="text-[9px] font-extrabold uppercase mt-0.5">Horn</span>
-            </button>
-          </div>
+              {/* Medium Square / 4:3 Video Display Area */}
+              <div className="relative w-full aspect-[4/3] max-w-lg mx-auto bg-slate-900 rounded-2xl overflow-hidden shadow-inner flex items-center justify-center border border-slate-200">
+                <CameraBg
+                  frame={cameraFrame}
+                  cameraConnected={cameraConnected}
+                />
 
-          {/* BOTTOM CENTER: TELEMETRY PILLS */}
-          <div className="hidden sm:flex items-center gap-2 bg-white/80 p-2 rounded-3xl border border-slate-200/80 shadow-lg backdrop-blur-md">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 px-2 py-1 bg-slate-50 rounded-xl border border-slate-200/60">
-              <Battery size={14} className="text-emerald-600" />
-              <span>{telemetry?.battery !== undefined ? `${telemetry.battery}%` : "--"}</span>
+                {/* FLOATING TOP-CENTER EYE SERVO CONTROLLER */}
+                <div className="absolute top-3 inset-x-0 flex justify-center z-10 pointer-events-auto">
+                  <CameraEyeController
+                    disabled={controlDisabled}
+                    onServoCamera={sendServoCamera}
+                  />
+                </div>
+              </div>
+
+              {/* Camera Tip */}
+              <p className="text-center text-xs font-semibold text-slate-500">
+                💡 Drag eye controller to pan/tilt camera nozzle • Auto-centers
+                on release
+              </p>
             </div>
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 px-2 py-1 bg-slate-50 rounded-xl border border-slate-200/60">
-              <Gauge size={14} className="text-sky-600" />
-              <span>{telemetry?.speed !== undefined ? `${telemetry.speed} km/h` : "0 km/h"}</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 px-2 py-1 bg-slate-50 rounded-xl border border-slate-200/60">
-              <Thermometer size={14} className="text-rose-600" />
-              <span>{telemetry?.temperature !== undefined ? `${telemetry.temperature}°C` : "--"}</span>
-            </div>
-          </div>
 
-          {/* BOTTOM RIGHT: STEERING CONTROLLER + SPRAY TOGGLE + WATER PUMP TOGGLE */}
-          <div className="flex items-end gap-2">
-            
-            {/* SPRAY ACTION TOGGLE */}
-            <button
-              type="button"
-              disabled={controlDisabled}
-              onClick={() => sendSpray(sprayOn ? "OFF" : "ON")}
-              className={[
-                "flex h-16 w-16 flex-col items-center justify-center rounded-3xl border-2 font-bold shadow-xl transition active:scale-90 disabled:opacity-40 backdrop-blur-md",
-                sprayOn
-                  ? "border-blue-400 bg-blue-100 text-blue-700 shadow-blue-200 animate-pulse"
-                  : "border-slate-200 bg-white/90 text-slate-600 hover:bg-white",
-              ].join(" ")}
-              title="Toggle Spray Nozzle"
-            >
-              <Droplets size={24} className={sprayOn ? "text-blue-600" : "text-slate-400"} />
-              <span className="text-[9px] font-extrabold uppercase mt-0.5">
-                {sprayOn ? "Spray ON" : "Spray"}
+            {/* TELEMETRY METRICS GRID */}
+            <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-5 flex flex-col gap-3">
+              <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-2">
+                Telemetry & Sensors
               </span>
-            </button>
 
-            {/* WATER PUMP DRAWER TOGGLE */}
-            <button
-              type="button"
-              disabled={controlDisabled}
-              onClick={() => setShowWaterPanel((prev) => !prev)}
-              className={[
-                "flex h-16 w-16 flex-col items-center justify-center rounded-3xl border-2 font-bold shadow-xl transition active:scale-90 disabled:opacity-40 backdrop-blur-md",
-                showWaterPanel || refillOn || waterSprayOn
-                  ? "border-cyan-400 bg-cyan-100 text-cyan-700 shadow-cyan-200"
-                  : "border-slate-200 bg-white/90 text-slate-600 hover:bg-white",
-              ].join(" ")}
-              title="Water Pump Control Panel"
-            >
-              <Waves size={24} className={refillOn || waterSprayOn ? "text-cyan-600" : "text-slate-500"} />
-              <span className="text-[9px] font-extrabold uppercase mt-0.5">Pump Panel</span>
-            </button>
+              <div className="grid grid-cols-5 gap-2.5">
+                <div className="flex flex-col gap-1 p-2.5 rounded-2xl bg-slate-50 border border-slate-200/70">
+                  <div className="flex items-center gap-1 text-[11px] font-bold text-slate-500">
+                    <Battery size={13} className="text-emerald-600" />
+                    <span>Battery</span>
+                  </div>
+                  <span className="text-base font-extrabold text-slate-900">
+                    {telemetry?.battery !== undefined
+                      ? `${telemetry.battery}%`
+                      : "100%"}
+                  </span>
+                </div>
 
-            {/* STEERING JOYSTICK */}
-            <GameSteerJoystick
-              disabled={controlDisabled}
-              onMove={sendMovement}
-            />
+                <div className="flex flex-col gap-1 p-2.5 rounded-2xl bg-slate-50 border border-slate-200/70">
+                  <div className="flex items-center gap-1 text-[11px] font-bold text-slate-500">
+                    <Gauge size={13} className="text-sky-600" />
+                    <span>Speed</span>
+                  </div>
+                  <span className="text-base font-extrabold text-slate-900">
+                    {telemetry?.speed !== undefined
+                      ? `${telemetry.speed.toFixed(1)} km/h`
+                      : "0.0 km/h"}
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-1 p-2.5 rounded-2xl bg-slate-50 border border-slate-200/70">
+                  <div className="flex items-center gap-1 text-[11px] font-bold text-slate-500">
+                    <Cpu size={13} className="text-indigo-600" />
+                    <span>RPM</span>
+                  </div>
+                  <span className="text-base font-extrabold text-slate-900">
+                    {telemetry?.rpm !== undefined
+                      ? `${telemetry.rpm} RPM`
+                      : "0 RPM"}
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-1 p-2.5 rounded-2xl bg-slate-50 border border-slate-200/70">
+                  <div className="flex items-center gap-1 text-[11px] font-bold text-slate-500">
+                    <Thermometer size={13} className="text-rose-600" />
+                    <span>Temp</span>
+                  </div>
+                  <span className="text-base font-extrabold text-slate-900">
+                    {telemetry?.temperature !== undefined
+                      ? `${telemetry.temperature}°C`
+                      : "32°C"}
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-1 p-2.5 rounded-2xl bg-slate-50 border border-slate-200/70">
+                  <div className="flex items-center gap-1 text-[11px] font-bold text-slate-500">
+                    <Waves size={13} className="text-cyan-600" />
+                    <span>Tank Level</span>
+                  </div>
+                  <span className="text-base font-extrabold text-slate-900">
+                    {waterPercent !== null && waterPercent !== undefined
+                      ? `${waterPercent}%`
+                      : "N/A"}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
 
-        </footer>
+          {/* RIGHT COLUMN (COL-SPAN 5): CONTROLS & WATER SYSTEM */}
+          <div className="col-span-5 flex flex-col gap-6">
+            {/* MOVEMENT & DRIVE CARD */}
+            <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-5 flex flex-col gap-4">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-xl bg-slate-100 border border-slate-200">
+                    <BotIcon size={16} className="text-slate-700" />
+                  </div>
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+                    Robot Drive & Steering
+                  </span>
+                </div>
 
-        {/* FLOATING WATER PUMP CONTROL CARD */}
-        {showWaterPanel && (
-          <div className="pointer-events-auto absolute bottom-24 right-4 z-50 w-72 sm:w-80 shadow-2xl rounded-3xl border border-slate-200 bg-white/95 p-2 backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4">
-            <div className="flex items-center justify-between px-3 py-1 border-b border-slate-100 pb-2 mb-2">
-              <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                <Waves size={16} className="text-cyan-600" />
-                Water Pump System
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowWaterPanel(false)}
-                className="text-xs font-bold text-slate-400 hover:text-slate-600"
-              >
-                ✕ Close
-              </button>
+                <button
+                  id="horn-btn"
+                  type="button"
+                  disabled={controlDisabled}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    sendHorn(1);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border border-amber-300 bg-amber-50 text-amber-800 text-xs font-extrabold hover:bg-amber-100 transition active:scale-95 shadow-xs disabled:opacity-40"
+                  title="Sound Horn"
+                >
+                  <Volume2 size={14} className="text-amber-600" />
+                  <span>HORN [H]</span>
+                </button>
+              </div>
+
+              {/* Side-by-Side Joysticks */}
+              <div className="flex items-center justify-around gap-4 bg-slate-50/80 p-4 rounded-2xl border border-slate-100">
+                <GameDriveJoystick
+                  disabled={controlDisabled}
+                  onMove={sendMovement}
+                />
+                <GameSteerJoystick
+                  disabled={controlDisabled}
+                  onMove={sendMovement}
+                />
+              </div>
+
+              {/* Quick Action Button Bar */}
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                {/* SPRAY ACTION TOGGLE */}
+                <button
+                  type="button"
+                  disabled={controlDisabled}
+                  onClick={() => {
+                    const nextState = sprayOn ? "OFF" : "ON";
+                    sendSpray(nextState);
+                  }}
+                  className={[
+                    "flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-xs font-extrabold shadow-xs transition active:scale-95 disabled:opacity-40",
+                    sprayOn
+                      ? "border-teal-300 bg-teal-600 text-white shadow-teal-200"
+                      : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100",
+                  ].join(" ")}
+                >
+                  <Droplets
+                    size={16}
+                    className={sprayOn ? "animate-bounce" : "text-slate-400"}
+                  />
+                  <span>{sprayOn ? "SPRAYING ON" : "TOGGLE SPRAY"}</span>
+                </button>
+
+                {/* EMERGENCY STOP */}
+                <button
+                  type="button"
+                  disabled={controlDisabled}
+                  onClick={() => sendMovement("STOP", 0)}
+                  className="flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 px-4 py-3 text-xs font-extrabold shadow-xs transition active:scale-95 disabled:opacity-40"
+                >
+                  <Square size={14} className="text-rose-600 fill-rose-600" />
+                  <span>STOP [SPACE]</span>
+                </button>
+              </div>
+
+              {/* Keyboard shortcut hint */}
+              <p className="text-center text-[11px] font-medium text-slate-400">
+                Press{" "}
+                <kbd className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-[10px]">
+                  W
+                </kbd>
+                <kbd className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-[10px] ml-0.5">
+                  A
+                </kbd>
+                <kbd className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-[10px] ml-0.5">
+                  S
+                </kbd>
+                <kbd className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-[10px] ml-0.5">
+                  D
+                </kbd>{" "}
+                or Arrow keys to drive
+              </p>
             </div>
+
+            {/* WATER PUMP SYSTEM CONTROLLER */}
             <WaterPumpController
               disabled={controlDisabled}
               connected={waterPumpConnected}
@@ -903,9 +1271,8 @@ export default function BotPage() {
               onSpray={sendWaterSpray}
             />
           </div>
-        )}
-
-      </div>
-    </main>
+        </div>
+      </main>
+    </>
   );
 }

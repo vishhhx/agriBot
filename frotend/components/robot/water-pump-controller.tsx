@@ -62,12 +62,12 @@ function arcPath(percent: number, r = 38, cx = 48, cy = 48): string {
 
 function TankArc({ percent, tankFull }: { percent: number; tankFull: boolean }) {
   const colour = tankFull
-    ? "#22d3ee"              // cyan when full
+    ? "#0891b2"              // cyan-600 when full
     : percent > 60
-    ? "#34d399"              // emerald
+    ? "#059669"              // emerald-600
     : percent > 30
-    ? "#facc15"              // yellow
-    : "#f87171";             // red when low
+    ? "#d97706"              // amber-600
+    : "#dc2626";             // red-600 when low
 
   return (
     <svg viewBox="0 0 96 96" className="h-full w-full" aria-hidden>
@@ -75,7 +75,7 @@ function TankArc({ percent, tankFull }: { percent: number; tankFull: boolean }) 
       <circle
         cx={48} cy={48} r={38}
         fill="none"
-        stroke="rgba(255,255,255,0.07)"
+        stroke="rgba(0,0,0,0.07)"
         strokeWidth={8}
       />
       {/* Progress */}
@@ -102,9 +102,9 @@ function TankArc({ percent, tankFull }: { percent: number; tankFull: boolean }) 
         x={48} y={44}
         textAnchor="middle"
         dominantBaseline="middle"
-        className="font-bold"
+        className="font-extrabold"
         style={{
-          fontSize: 15,
+          fontSize: 16,
           fill: colour,
           fontFamily: "monospace",
         }}
@@ -117,8 +117,9 @@ function TankArc({ percent, tankFull }: { percent: number; tankFull: boolean }) 
         dominantBaseline="middle"
         style={{
           fontSize: 8,
-          fill: "rgba(255,255,255,0.5)",
-          fontFamily: "monospace",
+          fill: "#64748b",
+          fontWeight: "700",
+          letterSpacing: "0.05em",
         }}
       >
         TANK
@@ -146,83 +147,85 @@ export function WaterPumpController({
   const isSensorActive = sensorPresent && waterDistanceCm !== null && waterDistanceCm >= 0;
   const tankPercent = isSensorActive ? distanceToPercent(waterDistanceCm, waterPercent) : 0;
 
-  const refillDisabled = disabled || !connected || (isSensorActive && tankFull && !refillOn);
+  const refillDisabled = disabled || !connected || (isSensorActive && (tankFull || tankPercent >= 90) && !refillOn);
 
   return (
     <div
       id="water-pump-controller"
-      className="flex flex-col gap-4 select-none rounded-2xl border border-cyan-500/20 bg-slate-950/70 p-4 shadow-2xl backdrop-blur-xl"
+      className="flex flex-col gap-4 select-none rounded-3xl border border-slate-200/90 bg-white p-5 shadow-sm text-slate-800"
     >
       {/* ------------------------------------------------ Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
         <div className="flex items-center gap-2">
-          <Waves size={15} className="text-cyan-400" aria-hidden />
-          <span className="text-[11px] font-bold uppercase tracking-widest text-cyan-400">
+          <div className="p-1.5 rounded-xl bg-cyan-50 border border-cyan-100">
+            <Waves size={16} className="text-cyan-600" aria-hidden />
+          </div>
+          <span className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
             Water System
           </span>
         </div>
 
         {/* Connection badge */}
         {connected ? (
-          <span className="flex items-center gap-1 rounded-full border border-cyan-500/30 bg-cyan-900/30 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-cyan-400">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-cyan-400" />
+          <span className="flex items-center gap-1.5 rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-cyan-700">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-500" />
             Live
           </span>
         ) : (
-          <span className="flex items-center gap-1 rounded-full border border-slate-700 bg-slate-800/50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">
-            <WifiOff size={9} aria-hidden />
+          <span className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+            <WifiOff size={10} aria-hidden />
             Offline
           </span>
         )}
       </div>
 
       {/* ------------------------------------------------ Tank level */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 bg-slate-50/80 p-3 rounded-2xl border border-slate-100">
         <div className="h-20 w-20 shrink-0">
-          <TankArc percent={isSensorActive ? tankPercent : 0} tankFull={isSensorActive && tankFull} />
+          <TankArc percent={isSensorActive ? tankPercent : 0} tankFull={isSensorActive && (tankFull || tankPercent >= 90)} />
         </div>
 
         <div className="flex flex-col gap-1.5 text-xs">
           <div className="flex items-center gap-1.5">
             {!isSensorActive ? (
-              <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[9px] font-bold text-slate-400">
-                Sensor N/A (Manual Mode)
+              <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[9px] font-bold text-slate-600">
+                Manual Mode
               </span>
-            ) : tankFull ? (
-              <CheckCircle2 size={12} className="text-cyan-400" aria-hidden />
+            ) : tankFull || tankPercent >= 90 ? (
+              <CheckCircle2 size={14} className="text-cyan-600" aria-hidden />
             ) : (
-              <AlertTriangle size={12} className={tankPercent < 20 ? "text-red-400" : "text-yellow-400"} aria-hidden />
+              <AlertTriangle size={14} className={tankPercent < 20 ? "text-red-500" : "text-amber-500"} aria-hidden />
             )}
-            <span className={`font-semibold ${isSensorActive && tankFull ? "text-cyan-300" : "text-slate-300"}`}>
-              {!isSensorActive ? "Tank Status" : tankFull ? "Tank Full (<= 2 in)" : "Tank Level"}
+            <span className={`font-bold ${isSensorActive && (tankFull || tankPercent >= 90) ? "text-cyan-700" : "text-slate-800"}`}>
+              {!isSensorActive ? "Tank Sensor N/A" : tankFull || tankPercent >= 90 ? "Tank Full (90%+)" : "Tank Level"}
             </span>
           </div>
 
           {isSensorActive ? (
             <div className="flex flex-col gap-0.5">
-              <span className="font-mono text-[10px] text-slate-300 font-bold">
-                {waterDistanceCm.toFixed(1)} cm / {(waterDistanceCm / 2.54).toFixed(1)} in depth
+              <span className="font-mono text-[11px] text-slate-600 font-bold">
+                {waterDistanceCm.toFixed(1)} cm depth
               </span>
-              <span className="font-mono text-[9px] text-cyan-400/90">
+              <span className="font-mono text-[10px] text-cyan-600 font-extrabold">
                 {tankPercent}% Capacity Remaining
               </span>
             </div>
           ) : (
-            <span className="font-mono text-[10px] text-slate-500">
-              Ultrasonic sensor not detected — pumps enabled manually.
+            <span className="text-[10px] text-slate-500">
+              Sensor not detected — manual operation active.
             </span>
           )}
 
           <div className="flex gap-1.5 pt-0.5">
             {refillOn && (
-              <span className="flex items-center gap-1 rounded-full bg-blue-900/40 px-2 py-0.5 text-[9px] font-bold text-blue-300">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-400" />
+              <span className="flex items-center gap-1 rounded-full bg-blue-100 border border-blue-200 px-2 py-0.5 text-[9px] font-extrabold text-blue-700">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-600" />
                 REFILLING
               </span>
             )}
             {sprayOn && (
-              <span className="flex items-center gap-1 rounded-full bg-teal-900/40 px-2 py-0.5 text-[9px] font-bold text-teal-300">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-teal-400" />
+              <span className="flex items-center gap-1 rounded-full bg-teal-100 border border-teal-200 px-2 py-0.5 text-[9px] font-extrabold text-teal-700">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-teal-600" />
                 SPRAYING
               </span>
             )}
@@ -230,11 +233,8 @@ export function WaterPumpController({
         </div>
       </div>
 
-      {/* ------------------------------------------------ Divider */}
-      <div className="h-px bg-white/5" />
-
       {/* ------------------------------------------------ Pump buttons */}
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2.5">
 
         {/* REFILL PUMP */}
         <button
@@ -244,40 +244,37 @@ export function WaterPumpController({
           aria-label={refillOn ? "Stop refill pump" : "Start refill pump"}
           onClick={() => onRefill(refillOn ? "OFF" : "ON")}
           className={[
-            "group relative flex items-center gap-3 overflow-hidden rounded-xl border px-4 py-3 text-sm font-semibold",
-            "transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400",
-            "disabled:cursor-not-allowed disabled:opacity-30",
+            "group relative flex items-center gap-3 overflow-hidden rounded-2xl border px-4 py-3 text-xs font-extrabold",
+            "transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+            "disabled:cursor-not-allowed disabled:opacity-40",
             refillOn
-              ? "border-blue-500/50 bg-blue-600/20 text-blue-300 shadow-[0_0_18px_rgba(59,130,246,0.2)]"
-              : "border-slate-700/80 bg-slate-800/60 text-slate-300 hover:border-blue-600/40 hover:bg-slate-800",
+              ? "border-blue-300 bg-blue-50 text-blue-700 shadow-sm"
+              : "border-slate-200 bg-slate-50/70 text-slate-700 hover:border-blue-300 hover:bg-blue-50/50",
           ].join(" ")}
         >
-          <RefreshCw
-            size={16}
-            className={refillOn ? "text-blue-400 animate-spin" : "text-slate-400"}
-            aria-hidden
-          />
+          <div className={`p-2 rounded-xl ${refillOn ? "bg-blue-600 text-white" : "bg-white text-slate-500 shadow-xs border border-slate-200"}`}>
+            <RefreshCw
+              size={15}
+              className={refillOn ? "animate-spin" : ""}
+              aria-hidden
+            />
+          </div>
           <span className="flex flex-col items-start leading-tight">
-            <span>Refill Pump</span>
-            <span className="text-[9px] font-normal opacity-60">
+            <span className="text-slate-900 font-bold">Refill Pump</span>
+            <span className="text-[10px] font-semibold text-slate-400">
               Source → Tank
             </span>
           </span>
           <span
             className={[
-              "ml-auto rounded-full px-2 py-0.5 text-[9px] font-bold uppercase",
+              "ml-auto rounded-full px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wider",
               refillOn
-                ? "bg-blue-500/20 text-blue-300"
-                : "bg-slate-700 text-slate-400",
+                ? "bg-blue-600 text-white shadow-xs"
+                : "bg-slate-200 text-slate-600",
             ].join(" ")}
           >
             {refillOn ? "ON" : "OFF"}
           </span>
-
-          {/* Ripple effect when active */}
-          {refillOn && (
-            <span className="pointer-events-none absolute inset-0 animate-pulse rounded-xl bg-blue-500/5" />
-          )}
         </button>
 
         {/* SPRAY PUMP */}
@@ -288,51 +285,51 @@ export function WaterPumpController({
           aria-label={sprayOn ? "Stop spray pump" : "Start spray pump"}
           onClick={() => onSpray(sprayOn ? "OFF" : "ON")}
           className={[
-            "group relative flex items-center gap-3 overflow-hidden rounded-xl border px-4 py-3 text-sm font-semibold",
-            "transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400",
-            "disabled:cursor-not-allowed disabled:opacity-30",
+            "group relative flex items-center gap-3 overflow-hidden rounded-2xl border px-4 py-3 text-xs font-extrabold",
+            "transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500",
+            "disabled:cursor-not-allowed disabled:opacity-40",
             sprayOn
-              ? "border-teal-500/50 bg-teal-600/20 text-teal-300 shadow-[0_0_18px_rgba(20,184,166,0.2)]"
-              : "border-slate-700/80 bg-slate-800/60 text-slate-300 hover:border-teal-600/40 hover:bg-slate-800",
+              ? "border-teal-300 bg-teal-50 text-teal-700 shadow-sm"
+              : "border-slate-200 bg-slate-50/70 text-slate-700 hover:border-teal-300 hover:bg-teal-50/50",
           ].join(" ")}
         >
-          <Droplets
-            size={16}
-            className={sprayOn ? "text-teal-400 animate-bounce" : "text-slate-400"}
-            aria-hidden
-          />
+          <div className={`p-2 rounded-xl ${sprayOn ? "bg-teal-600 text-white" : "bg-white text-slate-500 shadow-xs border border-slate-200"}`}>
+            <Droplets
+              size={15}
+              className={sprayOn ? "animate-bounce" : ""}
+              aria-hidden
+            />
+          </div>
           <span className="flex flex-col items-start leading-tight">
-            <span>Spray Pump</span>
-            <span className="text-[9px] font-normal opacity-60">
+            <span className="text-slate-900 font-bold">Spray Pump</span>
+            <span className="text-[10px] font-semibold text-slate-400">
               Tank → Nozzle
             </span>
           </span>
           <span
             className={[
-              "ml-auto rounded-full px-2 py-0.5 text-[9px] font-bold uppercase",
+              "ml-auto rounded-full px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wider",
               sprayOn
-                ? "bg-teal-500/20 text-teal-300"
-                : "bg-slate-700 text-slate-400",
+                ? "bg-teal-600 text-white shadow-xs"
+                : "bg-slate-200 text-slate-600",
             ].join(" ")}
           >
             {sprayOn ? "ON" : "OFF"}
           </span>
-
-          {sprayOn && (
-            <span className="pointer-events-none absolute inset-0 animate-pulse rounded-xl bg-teal-500/5" />
-          )}
         </button>
       </div>
 
       {/* ------------------------------------------------ Safety note */}
-      {tankFull && (
-        <p className="rounded-lg border border-cyan-500/20 bg-cyan-900/20 px-3 py-2 text-[10px] text-cyan-300">
-          🛡 Refill pump blocked — tank is full. Spray pump remains available.
+      {(tankFull || tankPercent >= 90) && (
+        <p className="rounded-xl border border-cyan-200 bg-cyan-50/80 px-3 py-2 text-[10px] font-semibold text-cyan-800 flex items-center gap-1.5">
+          <CheckCircle2 size={12} className="text-cyan-600 shrink-0" />
+          Refill pump blocked — tank at 90%+ capacity.
         </p>
       )}
       {!connected && (
-        <p className="rounded-lg border border-red-500/20 bg-red-900/20 px-3 py-2 text-[10px] text-red-300">
-          ⚠ Water pump module offline. Both pumps locked for safety.
+        <p className="rounded-xl border border-rose-200 bg-rose-50/80 px-3 py-2 text-[10px] font-semibold text-rose-800 flex items-center gap-1.5">
+          <AlertTriangle size={12} className="text-rose-600 shrink-0" />
+          Water ESP offline. Pumps locked for safety.
         </p>
       )}
     </div>

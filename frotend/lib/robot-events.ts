@@ -1,10 +1,27 @@
 export type BotRole = "MOVEMENT_AND_OTHER" | "CAMERA" | "SERVO" | "WATER_PUMP";
 
-export type MovementDirection = "FORWARD" | "BACKWARD" | "LEFT" | "RIGHT" | "STOP";
+export type MovementDirection =
+  | "FORWARD"
+  | "BACKWARD"
+  | "LEFT"
+  | "RIGHT"
+  | "STOP";
 
-export type RobotStatus = "online" | "offline" | "idle" | "busy" | "maintenance";
+export type RobotStatus =
+  | "online"
+  | "offline"
+  | "idle"
+  | "busy"
+  | "maintenance";
 
-export type CameraServoCommand = "LEFT" | "RIGHT" | "UP" | "DOWN" | "CENTER";
+export type CameraServoCommand =
+  | "LEFT"
+  | "RIGHT"
+  | "UP"
+  | "DOWN"
+  | "CENTER"
+  | "PAN"
+  | "TILT";
 
 export type SprayCommand = "ON" | "OFF";
 
@@ -91,7 +108,10 @@ export type RobotStatusEvent = {
 };
 
 export type RobotConnectedEvent = { type: "robot:connected"; robotId: string };
-export type RobotDisconnectedEvent = { type: "robot:disconnected"; robotId: string };
+export type RobotDisconnectedEvent = {
+  type: "robot:disconnected";
+  robotId: string;
+};
 
 export type RobotTelemetryEvent = {
   type: "robot:telemetry";
@@ -100,6 +120,7 @@ export type RobotTelemetryEvent = {
   payload: {
     battery?: number;
     speed?: number;
+    rpm?: number;
     temperature?: number;
     latitude?: number;
     longitude?: number;

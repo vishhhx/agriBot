@@ -48,7 +48,7 @@ const char* ROBOT_ID =
 //
 
 const char* ROBOT_SECRET =
-    "a8jH2diBDteEx6AL-KiuFeGSBavxbhkaDszHaMrhkuQ";
+  "skhtpAftcrkL-ujQK_9-Hxxo9dpeauBuHuSBcQmcQzI";
 
 
 // =====================================================
@@ -238,7 +238,7 @@ float getWaterDistance() {
   delayMicroseconds(10);
   digitalWrite(ULTRASONIC_TRIG, LOW);
 
-  long duration = pulseIn(ULTRASONIC_ECHO, HIGH, 30000); // 30ms timeout (~5m max)
+  long duration = pulseIn(ULTRASONIC_ECHO, HIGH, 10000); // 10ms timeout (~1.7m max)
   if (duration == 0) {
     return -1.0; // Sensor not connected or timed out
   }
@@ -256,8 +256,10 @@ float getWaterDistance() {
 // =====================================================
 
 void refillPumpOn() {
-  if (sensorPresent && tankFull) {
-    Serial.println("[REFILL BLOCKED] Tank is already full (Water within 2 inches)");
+  if (sensorPresent && (tankFull || currentWaterPercent >= 90)) {
+    Serial.print("[REFILL BLOCKED] Tank is already at ");
+    Serial.print(currentWaterPercent);
+    Serial.println("% capacity (>= 90%)");
     sendWaterEvent("TANK_FULL");
     return;
   }
@@ -333,8 +335,11 @@ void stopAllPumps() {
 }
 
 // =====================================================
-// WATER LEVEL MONITOR (ULTRASONIC REACTIVE AUTO-STOP)
+// WATER LEVEL MONITOR (ULTRASONIC REACTIVE AUTO-STOP & TELEMETRY)
 // =====================================================
+
+unsigned long lastTelemetrySend = 0;
+const unsigned long TELEMETRY_INTERVAL = 1000; // Send tank telemetry every 1s
 
 void checkWaterLevel() {
   if (millis() - lastUltrasonicCheck < ULTRASONIC_INTERVAL) return;
@@ -360,35 +365,54 @@ void checkWaterLevel() {
     Serial.println("[ULTRASONIC] Sensor detected!");
   }
 
-  currentWaterDistance = distance;
-
-  // Calculate percentage: 2 inches (5.08 cm) = 100%, 40 cm = 0%
-  if (distance <= TANK_FULL_DISTANCE_CM) {
-    currentWaterPercent = 100;
-  } else if (distance >= TANK_EMPTY_DISTANCE_CM) {
-    currentWaterPercent = 0;
+  // Smooth raw distance (exponential moving average)
+  if (currentWaterDistance < 0) {
+    currentWaterDistance = distance;
   } else {
-    currentWaterPercent = (int)(((TANK_EMPTY_DISTANCE_CM - distance) / (TANK_EMPTY_DISTANCE_CM - TANK_FULL_DISTANCE_CM)) * 100.0);
+    currentWaterDistance = (0.7f * distance) + (0.3f * currentWaterDistance);
   }
 
-  // Check 2-inch cutoff limit (5.08 cm)
-  if (distance <= TANK_FULL_DISTANCE_CM) {
+  // Calculate percentage: 2 inches (5.08 cm) = 100%, 40 cm = 0%
+  if (currentWaterDistance <= TANK_FULL_DISTANCE_CM) {
+    currentWaterPercent = 100;
+  } else if (currentWaterDistance >= TANK_EMPTY_DISTANCE_CM) {
+    currentWaterPercent = 0;
+  } else {
+    currentWaterPercent = (int)(((TANK_EMPTY_DISTANCE_CM - currentWaterDistance) / (TANK_EMPTY_DISTANCE_CM - TANK_FULL_DISTANCE_CM)) * 100.0);
+  }
+
+  // Check 90% capacity cutoff limit (Auto-stop refill pump at 90%)
+  if (currentWaterPercent >= 90) {
     if (!tankFull) {
       tankFull = true;
-      Serial.print("[TANK FULL DETECTED] Water surface distance: ");
-      Serial.print(distance);
-      Serial.println(" cm (<= 2 inches)");
+      Serial.print("[TANK FULL DETECTED] Water level reached ");
+      Serial.print(currentWaterPercent);
+      Serial.println("% (>= 90% threshold)");
       sendWaterEvent("TANK_FULL");
     }
 
-    // Auto shut off refill motor when water reaches within 2 inches
+    // Auto shut off refill motor when water reaches 90%
     if (refillPumpState) {
       refillPumpOff();
-      Serial.println("[REFILL AUTO-STOP] Water reached 2-inch proximity safety threshold!");
+      Serial.print("[REFILL AUTO-STOP] Water level reached ");
+      Serial.print(currentWaterPercent);
+      Serial.println("% (auto-stopped at 90% threshold)!");
       sendWaterEvent("REFILL_AUTO_STOPPED");
     }
   } else {
     tankFull = false;
+  }
+
+  // Send periodic telemetry if 1.5s elapsed OR if distance changed significantly (>= 0.3cm)
+  if (wsConnected && robotRegistered) {
+    static float lastSentDistance = -999.0;
+    bool timeElapsed = (millis() - lastTelemetrySend >= TELEMETRY_INTERVAL);
+    bool distChanged = (fabs(currentWaterDistance - lastSentDistance) >= 0.3f);
+    if (timeElapsed || distChanged) {
+      lastTelemetrySend = millis();
+      lastSentDistance = currentWaterDistance;
+      sendWaterEvent("WATER_TELEMETRY");
+    }
   }
 }
 
@@ -397,98 +421,38 @@ void checkWaterLevel() {
 // =====================================================
 
 void sendRegistration() {
-
   if (!wsConnected) {
-
     return;
   }
 
-  JsonDocument doc;
-
-  doc["type"] =
-    "robot:register";
-
-  doc["client"] =
-    "robot";
-
-  doc["robotId"] =
-    ROBOT_ID;
-
-  doc["secret"] =
-    ROBOT_SECRET;
-
-  JsonArray roles =
-    doc["roles"]
-      .to<JsonArray>();
-
-  roles.add(
-    "WATER_PUMP"
+  char buf[256];
+  snprintf(buf, sizeof(buf),
+    "{\"type\":\"robot:register\",\"client\":\"robot\",\"robotId\":\"%s\",\"secret\":\"%s\",\"roles\":[\"WATER_PUMP\"]}",
+    ROBOT_ID, ROBOT_SECRET
   );
 
-  String registration;
-
-  serializeJson(
-    doc,
-    registration
-  );
-
-  Serial.println(
-    "[ROBOT] Sending WATER registration..."
-  );
-
-  webSocket.sendTXT(
-    registration
-  );
+  Serial.println("[ROBOT] Sending WATER registration...");
+  webSocket.sendTXT(buf);
 }
 
 // =====================================================
 // SEND STATUS
 // =====================================================
 
-void sendStatus(
-  const char* status
-) {
-
-  if (
-    !wsConnected ||
-    !robotRegistered
-  ) {
-
+void sendStatus(const char* status) {
+  if (!wsConnected || !robotRegistered) {
     return;
   }
 
-  JsonDocument doc;
-
-  doc["type"] =
-    "robot:status";
-
-  doc["robotId"] =
-    ROBOT_ID;
-
-  doc["role"] =
-    "WATER_PUMP";
-
-  doc["status"] =
-    status;
-
-  String message;
-
-  serializeJson(
-    doc,
-    message
+  char buf[180];
+  snprintf(buf, sizeof(buf),
+    "{\"type\":\"robot:status\",\"robotId\":\"%s\",\"role\":\"WATER_PUMP\",\"status\":\"%s\"}",
+    ROBOT_ID, status
   );
 
-  webSocket.sendTXT(
-    message
-  );
-
-  Serial.print(
-    "[STATUS] "
-  );
-
-  Serial.println(
-    status
-  );
+  webSocket.sendTXT(buf);
+  Serial.print("[STATUS] ");
+  Serial.println(status);
 }
 
 // =====================================================
@@ -500,28 +464,30 @@ void sendWaterEvent(const char* eventName) {
     return;
   }
 
-  JsonDocument doc;
+  char jsonBuf[256];
+  snprintf(jsonBuf, sizeof(jsonBuf),
+    "{\"type\":\"water:event\",\"robotId\":\"%s\",\"event\":\"%s\",\"refillPump\":%s,\"sprayPump\":%s,\"tankFull\":%s,\"waterDistanceCm\":%.2f,\"waterPercent\":%d,\"sensorPresent\":%s}",
+    ROBOT_ID,
+    eventName,
+    refillPumpState ? "true" : "false",
+    sprayPumpState ? "true" : "false",
+    tankFull ? "true" : "false",
+    currentWaterDistance,
+    currentWaterPercent,
+    sensorPresent ? "true" : "false"
+  );
 
-  doc["type"] = "water:event";
-  doc["robotId"] = ROBOT_ID;
-  doc["event"] = eventName;
-  doc["refillPump"] = refillPumpState;
-  doc["sprayPump"] = sprayPumpState;
-  doc["tankFull"] = tankFull;
-  doc["waterDistanceCm"] = currentWaterDistance;
-  doc["waterPercent"] = currentWaterPercent;
-  doc["sensorPresent"] = sensorPresent;
+  webSocket.sendTXT(jsonBuf);
 
-  String message;
-  serializeJson(doc, message);
-  webSocket.sendTXT(message);
-
-  Serial.print("[WATER EVENT SENT] ");
-  Serial.print(eventName);
-  Serial.print(" | Dist=");
-  Serial.print(currentWaterDistance);
-  Serial.print("cm | Full=");
-  Serial.println(tankFull ? "YES" : "NO");
+  // Suppress repetitive WATER_TELEMETRY logs to prevent Serial UART buffer flooding
+  if (strcmp(eventName, "WATER_TELEMETRY") != 0) {
+    Serial.print("[WATER EVENT SENT] ");
+    Serial.print(eventName);
+    Serial.print(" | Dist=");
+    Serial.print(currentWaterDistance);
+    Serial.print("cm | Full=");
+    Serial.println(tankFull ? "YES" : "NO");
+  }
 }
 
 // =====================================================
@@ -844,21 +810,8 @@ void webSocketEvent(
 
     case WStype_TEXT:
 
-      Serial.print(
-        "[WS IN] "
-      );
-
-      for (
-        size_t i = 0;
-        i < length;
-        i++
-      ) {
-
-        Serial.print(
-          (char)payload[i]
-        );
-      }
-
+      Serial.print("[WS IN] ");
+      Serial.write(payload, length);
       Serial.println();
 
       {
@@ -868,7 +821,7 @@ void webSocketEvent(
         DeserializationError error =
           deserializeJson(
             doc,
-            payload,
+            (const char*)payload,
             length
           );
 

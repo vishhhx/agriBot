@@ -5,12 +5,21 @@ import { Robot } from "../models/robot";
 import User from "../models/user";
 
 import { robots, removeRobotIfEmpty } from "./state";
-import { connections, send, getConnectionLabel, getEventDetails } from "./connections";
+import {
+  connections,
+  send,
+  getConnectionLabel,
+  getEventDetails,
+} from "./connections";
 import { isBotRole } from "./roles";
 import { type Message } from "./types";
 import { broadcastRobotStatus, broadcastRobotDisconnected } from "./broadcast";
 import { subscribeUserToRobot } from "./handlers/subscription";
-import { registerRobot, handleRobotTelemetry, handleRobotStatus } from "./handlers/robot";
+import {
+  registerRobot,
+  handleRobotTelemetry,
+  handleRobotStatus,
+} from "./handlers/robot";
 import { handleCameraEvent, handleCameraFrame } from "./handlers/camera";
 import {
   handleCameraServoCommand,
@@ -38,14 +47,13 @@ export async function handleWebsocketMessages(
 ) {
   try {
     // =================================================
-    // BINARY MESSAGE  (camera module disabled)
+    // BINARY MESSAGE
     //
     // Camera JPEG frames arrive here when isBinary is true.
-    // Uncomment handleCameraFrame to re-enable.
     // =================================================
 
     if (isBinary) {
-      // handleCameraFrame(ws, rawMessage);  // disabled
+      handleCameraFrame(ws, rawMessage);
       return;
     }
 
@@ -60,10 +68,7 @@ export async function handleWebsocketMessages(
     const message = JSON.parse(rawString) as Message;
 
     if (message.type === "robot:register") {
-      console.log(
-        "[ROBOT REGISTER REQUEST]",
-        JSON.stringify(message, null, 2),
-      );
+      console.log("[ROBOT REGISTER REQUEST]", JSON.stringify(message, null, 2));
     }
 
     const event = getEventDetails(message);
@@ -186,7 +191,9 @@ export async function handleWebsocketMessages(
 
         // 1. Authentication Check
         if (!authenticatedUserId || !connection || connection.type !== "USER") {
-          console.warn(`[WS COMMAND REJECTED] reason=Authentication required user=${authenticatedUserId ?? "none"}`);
+          console.warn(
+            `[WS COMMAND REJECTED] reason=Authentication required user=${authenticatedUserId ?? "none"}`,
+          );
           send(ws, {
             type: "robot:command:rejected",
             robotId: robotId || "",
@@ -210,7 +217,9 @@ export async function handleWebsocketMessages(
 
         // 3. User Subscription Check
         if (!connection.robotIds.has(robotId)) {
-          console.warn(`[WS COMMAND REJECTED] reason=Robot subscription is required user=${connection.userId} robot=${robotId}`);
+          console.warn(
+            `[WS COMMAND REJECTED] reason=Robot subscription is required user=${connection.userId} robot=${robotId}`,
+          );
           send(ws, {
             type: "robot:command:rejected",
             robotId,
@@ -222,7 +231,9 @@ export async function handleWebsocketMessages(
 
         // 4. Role Check
         if (role !== "MOVEMENT_AND_OTHER") {
-          console.warn(`[WS COMMAND REJECTED] reason=Invalid movement role role=${role}`);
+          console.warn(
+            `[WS COMMAND REJECTED] reason=Invalid movement role role=${role}`,
+          );
           send(ws, {
             type: "robot:command:rejected",
             robotId,
@@ -242,7 +253,9 @@ export async function handleWebsocketMessages(
         ] as const;
 
         if (!validCommands.includes(command)) {
-          console.warn(`[WS COMMAND REJECTED] reason=Invalid movement command command=${command}`);
+          console.warn(
+            `[WS COMMAND REJECTED] reason=Invalid movement command command=${command}`,
+          );
           send(ws, {
             type: "robot:command:rejected",
             robotId,
@@ -254,7 +267,9 @@ export async function handleWebsocketMessages(
 
         // 6. Speed Check
         if (!Number.isFinite(speed) || speed < 0 || speed > 100) {
-          console.warn(`[WS COMMAND REJECTED] reason=Invalid movement speed speed=${speed}`);
+          console.warn(
+            `[WS COMMAND REJECTED] reason=Invalid movement speed speed=${speed}`,
+          );
           send(ws, {
             type: "robot:command:rejected",
             robotId,
@@ -265,7 +280,11 @@ export async function handleWebsocketMessages(
         }
 
         // 7. Request ID Check
-        if (!requestId || typeof requestId !== "string" || requestId.trim() === "") {
+        if (
+          !requestId ||
+          typeof requestId !== "string" ||
+          requestId.trim() === ""
+        ) {
           console.warn(`[WS COMMAND REJECTED] reason=Request ID required`);
           send(ws, {
             type: "robot:command:rejected",
@@ -282,7 +301,9 @@ export async function handleWebsocketMessages(
         }).select("_id");
 
         if (!user) {
-          console.warn(`[WS COMMAND REJECTED] reason=User not found in database userId=${connection.userId}`);
+          console.warn(
+            `[WS COMMAND REJECTED] reason=User not found in database userId=${connection.userId}`,
+          );
           send(ws, {
             type: "robot:command:rejected",
             robotId,
@@ -298,7 +319,9 @@ export async function handleWebsocketMessages(
         }).select("_id");
 
         if (!robotRecord) {
-          console.warn(`[WS COMMAND REJECTED] reason=Robot record not found robot=${robotId}`);
+          console.warn(
+            `[WS COMMAND REJECTED] reason=Robot record not found robot=${robotId}`,
+          );
           send(ws, {
             type: "robot:command:rejected",
             robotId,
@@ -319,7 +342,9 @@ export async function handleWebsocketMessages(
         );
 
         if (!hasControl) {
-          console.warn(`[WS COMMAND REJECTED] reason=You do not have movement permission user=${connection.userId} robot=${robotId}`);
+          console.warn(
+            `[WS COMMAND REJECTED] reason=You do not have movement permission user=${connection.userId} robot=${robotId}`,
+          );
           send(ws, {
             type: "robot:command:rejected",
             robotId,
@@ -335,7 +360,9 @@ export async function handleWebsocketMessages(
         const robot = robots.get(robotId);
 
         if (!robot) {
-          console.warn(`[WS COMMAND REJECTED] reason=Robot not found in memory robot=${robotId}`);
+          console.warn(
+            `[WS COMMAND REJECTED] reason=Robot not found in memory robot=${robotId}`,
+          );
           send(ws, {
             type: "robot:command:rejected",
             robotId,
@@ -349,7 +376,9 @@ export async function handleWebsocketMessages(
         const bot = robot.bots.get("MOVEMENT_AND_OTHER");
 
         if (!bot) {
-          console.warn(`[WS COMMAND REJECTED] reason=Movement module is not connected robot=${robotId}`);
+          console.warn(
+            `[WS COMMAND REJECTED] reason=Movement module is not connected robot=${robotId}`,
+          );
           send(ws, {
             type: "robot:command:rejected",
             robotId,
@@ -359,11 +388,15 @@ export async function handleWebsocketMessages(
           return;
         }
 
-        console.log(`[WS MOVEMENT BOT FOUND] robot=${robotId} role=MOVEMENT_AND_OTHER`);
+        console.log(
+          `[WS MOVEMENT BOT FOUND] robot=${robotId} role=MOVEMENT_AND_OTHER`,
+        );
 
         // 13. Verify WebSocket State before sending
         if (bot.ws.readyState !== WebSocket.OPEN) {
-          console.warn(`[WS COMMAND REJECTED] reason=Movement module WebSocket is not open robot=${robotId}`);
+          console.warn(
+            `[WS COMMAND REJECTED] reason=Movement module WebSocket is not open robot=${robotId}`,
+          );
           send(ws, {
             type: "robot:command:rejected",
             robotId,
@@ -513,7 +546,7 @@ export async function handleWebsocketMessages(
         }
 
         const hornRobot = robots.get(message.robotId);
-        const movBot    = hornRobot?.bots.get("MOVEMENT_AND_OTHER");
+        const movBot = hornRobot?.bots.get("MOVEMENT_AND_OTHER");
 
         if (!movBot) {
           send(ws, { type: "ERROR", message: "Movement module not connected" });
@@ -523,23 +556,24 @@ export async function handleWebsocketMessages(
         send(movBot.ws, {
           type: "COMMAND",
           data: {
-            robotId:  message.robotId,
-            command:  "HORN",
-            beeps:    message.beeps ?? 1,
-            userId:   connection.userId,
+            robotId: message.robotId,
+            command: "HORN",
+            beeps: message.beeps ?? 1,
+            userId: connection.userId,
             requestId: message.requestId,
           },
         });
 
         send(ws, { type: "horn:accepted", robotId: message.robotId });
-        console.log(`[HORN] user=${connection.userId} robot=${message.robotId} beeps=${message.beeps ?? 1}`);
+        console.log(
+          `[HORN] user=${connection.userId} robot=${message.robotId} beeps=${message.beeps ?? 1}`,
+        );
         break;
       }
 
       // ===============================================
       // GENERIC BOT COMMAND
       // ===============================================
-
 
       case "BOT_COMMAND": {
         const connection = connections.get(ws);
@@ -688,7 +722,9 @@ export async function handleWebsocketMessages(
 
           const roles = userConnection.roles.get(robotId);
 
-          const matchingRole = Array.from(connection.roles).find((r) => roles?.has(r));
+          const matchingRole = Array.from(connection.roles).find((r) =>
+            roles?.has(r),
+          );
 
           if (!matchingRole) {
             continue;

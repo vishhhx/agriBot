@@ -42,7 +42,7 @@ const char* ROBOT_ID =
 // =====================================================
 
 const char* ROBOT_SECRET =
-    "a8jH2diBDteEx6AL-KiuFeGSBavxbhkaDszHaMrhkuQ";
+    "skhtpAftcrkL-ujQK_9-Hxxo9dpeauBuHuSBcQmcQzI";
 
 
 // =====================================================
@@ -210,7 +210,7 @@ bool initCamera()
     // =================================================
 
     config.xclk_freq_hz =
-        20000000;
+        16000000;
 
 
     // =================================================
@@ -578,23 +578,6 @@ bool sendCameraFrame()
 
 
     // =================================================
-    // LOG
-    // =================================================
-
-    Serial.print(
-        "[CAMERA OUT] JPEG "
-    );
-
-    Serial.print(
-        fb->len / 1024
-    );
-
-    Serial.println(
-        " KB"
-    );
-
-
-    // =================================================
     // SEND BINARY
     // =================================================
 
@@ -614,11 +597,19 @@ bool sendCameraFrame()
     );
 
 
+    // Give Wi-Fi and Task Watchdog time to process TCP stack
+    yield();
+
+
     if (!sent)
     {
-        Serial.println(
-            "[CAMERA] Frame send FAILED"
-        );
+        static unsigned long lastErrPrint = 0;
+        if (millis() - lastErrPrint > 3000) {
+            lastErrPrint = millis();
+            Serial.println(
+                "[CAMERA] Frame send FAILED"
+            );
+        }
 
         return false;
     }
@@ -764,7 +755,7 @@ void webSocketEvent(
         DeserializationError error =
             deserializeJson(
                 doc,
-                payload,
+                (const char*)payload,
                 length
             );
 
@@ -1239,22 +1230,22 @@ void loop()
 
 
     // =================================================
-    // CAMERA STREAM  (disabled — uncomment to enable)
+    // CAMERA STREAM
     // =================================================
 
-    // if (
-    //     wsConnected &&
-    //     cameraRegistered
-    // )
-    // {
-    //     unsigned long now = millis();
-    //
-    //     if ( now - lastFrameTime >= FRAME_INTERVAL )
-    //     {
-    //         lastFrameTime = now;
-    //         sendCameraFrame();
-    //     }
-    // }
+    if (
+        wsConnected &&
+        cameraRegistered
+    )
+    {
+        unsigned long now = millis();
+
+        if ( now - lastFrameTime >= FRAME_INTERVAL )
+        {
+            lastFrameTime = now;
+            sendCameraFrame();
+        }
+    }
 
 
     delay(1);

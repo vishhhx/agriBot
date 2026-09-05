@@ -34,7 +34,7 @@ const char* ROBOT_ID =
     "robot_prash_001";
 
 const char* ROBOT_SECRET =
-    "a8jH2diBDteEx6AL-KiuFeGSBavxbhkaDszHaMrhkuQ";
+    "skhtpAftcrkL-ujQK_9-Hxxo9dpeauBuHuSBcQmcQzI";
 
 
 // =====================================================
@@ -45,23 +45,23 @@ WebSocketsClient webSocket;
 
 
 // =====================================================
-// LEFT BTS7960
+// LEFT BTS7960 - ESP32 38-pin
 // =====================================================
 
-#define LEFT_RPWM 4
-#define LEFT_LPWM 5
-#define LEFT_REN  6
-#define LEFT_LEN  7
+#define LEFT_RPWM 25
+#define LEFT_LPWM 26
+#define LEFT_REN  27
+#define LEFT_LEN  14
 
 
 // =====================================================
-// RIGHT BTS7960
+// RIGHT BTS7960 - ESP32 38-pin
 // =====================================================
 
-#define RIGHT_RPWM 15
-#define RIGHT_LPWM 16
-#define RIGHT_REN  17
-#define RIGHT_LEN  18
+#define RIGHT_RPWM 32
+#define RIGHT_LPWM 33
+#define RIGHT_REN  13
+#define RIGHT_LEN  12
 
 
 // =====================================================
@@ -79,7 +79,7 @@ WebSocketsClient webSocket;
 // Change this pin if GPIO 13 is already used
 // =====================================================
 
-#define HORN_PIN 13
+#define HORN_PIN 23
 
 bool hornState = false;
 
@@ -88,9 +88,9 @@ bool hornState = false;
 // OLED I2C
 // =====================================================
 
-// ESP32-S3 I2C pins
-#define OLED_SDA 9
-#define OLED_SCL 10
+// ESP32 38-pin DevKit/WROOM I2C pins
+#define OLED_SDA 21
+#define OLED_SCL 22
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -1766,7 +1766,7 @@ void setup() {
     );
 
     Serial.println(
-        " AGRIBOT ESP32-S3 + EYES + HORN"
+        " AGRIBOT ESP32 + EYES + HORN"
     );
 
     Serial.println(
