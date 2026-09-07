@@ -493,175 +493,119 @@ function GameDriveJoystick({
   );
 }
 
-function GameSteerJoystick({
+function SimpleMobileMovementPad({
   disabled,
   onMove,
-  compact = false,
 }: {
   disabled: boolean;
   onMove: (cmd: MovementDirection, speed?: number) => boolean | void;
-  compact?: boolean;
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [knobPos, setKnobPos] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const lastCmdRef = useRef<MovementDirection | null>(null);
-
   const stop = useCallback(() => {
-    lastCmdRef.current = "STOP";
     onMove("STOP", 0);
   }, [onMove]);
 
-  const processDrag = useCallback(
-    (offsetX: number, maxRadius: number) => {
-      const clampedX = Math.min(Math.max(offsetX, -maxRadius), maxRadius);
-      setKnobPos({ x: clampedX, y: 0 });
-
-      const speed = Math.round((Math.abs(clampedX) / maxRadius) * 100);
-
-      if (clampedX < -15) {
-        if (lastCmdRef.current !== "LEFT") {
-          lastCmdRef.current = "LEFT";
-          onMove("LEFT", Math.max(speed, 60));
-        }
-      } else if (clampedX > 15) {
-        if (lastCmdRef.current !== "RIGHT") {
-          lastCmdRef.current = "RIGHT";
-          onMove("RIGHT", Math.max(speed, 60));
-        }
-      } else {
-        if (lastCmdRef.current !== "STOP") {
-          stop();
-        }
-      }
+  const press = useCallback(
+    (command: MovementDirection) => {
+      if (disabled) return;
+      onMove(command, command === "STOP" ? 0 : 100);
     },
-    [onMove, stop],
+    [disabled, onMove],
   );
-
-  const handlePointerDown = (e: React.PointerEvent) => {
-    if (disabled) return;
-    setIsDragging(true);
-    e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const cx = rect.width / 2;
-    processDrag(e.clientX - rect.left - cx, cx - 25);
-  };
-
-  const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isDragging || !containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const cx = rect.width / 2;
-    processDrag(e.clientX - rect.left - cx, cx - 25);
-  };
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (disabled || !containerRef.current) return;
-    e.preventDefault();
-    setIsDragging(true);
-    const rect = containerRef.current.getBoundingClientRect();
-    const cx = rect.width / 2;
-    const touch = e.touches[0] ?? e.changedTouches[0];
-    processDrag(touch.clientX - rect.left - cx, cx - 25);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging || !containerRef.current) return;
-    e.preventDefault();
-    const rect = containerRef.current.getBoundingClientRect();
-    const cx = rect.width / 2;
-    const touch = e.touches[0] ?? e.changedTouches[0];
-    processDrag(touch.clientX - rect.left - cx, cx - 25);
-  };
-
-  const handlePointerUp = () => {
-    setIsDragging(false);
-    setKnobPos({ x: 0, y: 0 });
-    stop();
-  };
-
-  const handleTouchEnd = () => {
-    setIsDragging(false);
-    setKnobPos({ x: 0, y: 0 });
-    stop();
-  };
 
   return (
     <div
-      className="flex flex-col items-center gap-1.5 p-2.5 rounded-3xl bg-white/85 border border-slate-200/90 shadow-xl backdrop-blur-xl select-none touch-none"
+      className="flex flex-col items-center gap-2 rounded-3xl border border-slate-200/80 bg-white/90 p-2.5 shadow-xl backdrop-blur-md"
       style={{
         touchAction: "none",
         userSelect: "none",
         WebkitUserSelect: "none",
-        overscrollBehavior: "contain",
       }}
     >
-      <span className="text-[10px] font-extrabold uppercase tracking-wider text-sky-700">
-        Steering Joystick
+      <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-700">
+        Drive
       </span>
 
-      <div
-        ref={containerRef}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
-        className={[
-          "relative flex items-center justify-center rounded-full border-2 shadow-inner transition-all",
-          compact ? "h-16 w-24" : "h-24 w-32",
-          disabled
-            ? "opacity-40 cursor-not-allowed border-slate-200 bg-slate-100"
-            : "border-sky-300/80 bg-gradient-to-r from-sky-50/80 via-white to-sky-50/80 cursor-grab active:cursor-grabbing",
-        ].join(" ")}
-        style={{
-          touchAction: "none",
-          userSelect: "none",
-          WebkitUserSelect: "none",
-          overscrollBehavior: "contain",
-        }}
-      >
-        {/* Directional Guide Arrows */}
-        <div className="absolute left-2 flex items-center gap-1 text-sky-600">
-          <ArrowLeft size={compact ? 12 : 16} className="animate-bounce" />
-          <span className="text-[8px] font-black uppercase">LFT</span>
-        </div>
-        <div className="absolute right-2 flex items-center gap-1 text-sky-600">
-          <span className="text-[8px] font-black uppercase">RGT</span>
-          <ArrowRight size={compact ? 12 : 16} className="animate-bounce" />
-        </div>
-
-        {/* Horizontal Track Line */}
-        <div
-          className={`absolute rounded-full bg-sky-200/70 ${compact ? "w-14 h-0.5" : "w-20 h-1"}`}
-        />
-
-        {/* Joystick Thumbstick Knob */}
-        <div
-          className={[
-            "relative flex items-center justify-center rounded-full border-2 border-white shadow-xl transition-transform duration-75",
-            compact ? "h-10 w-10" : "h-14 w-14",
-            isDragging
-              ? "bg-gradient-to-tr from-sky-500 to-indigo-600 text-white scale-105"
-              : "bg-gradient-to-tr from-slate-700 to-slate-900 text-white",
-          ].join(" ")}
-          style={{
-            transform: `translate3d(${knobPos.x}px, 0, 0)`,
+      <div className="grid grid-cols-3 gap-2">
+        <div />
+        <button
+          type="button"
+          disabled={disabled}
+          aria-label="Move forward"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            press("FORWARD");
           }}
+          onPointerUp={stop}
+          onPointerLeave={stop}
+          onPointerCancel={stop}
+          className="flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-50 text-emerald-700 shadow-md transition active:scale-95 disabled:opacity-40"
         >
-          <div
-            className={`rounded-full border border-white/40 bg-white/20 flex items-center justify-center ${compact ? "h-4 w-4" : "h-6 w-6"}`}
-          >
-            <div
-              className={`${compact ? "h-1.5 w-1.5" : "h-2 w-2"} rounded-full bg-white`}
-            />
-          </div>
-        </div>
+          <ArrowUp size={18} />
+        </button>
+        <div />
+
+        <button
+          type="button"
+          disabled={disabled}
+          aria-label="Turn left"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            press("LEFT");
+          }}
+          onPointerUp={stop}
+          onPointerLeave={stop}
+          onPointerCancel={stop}
+          className="flex h-12 w-12 items-center justify-center rounded-2xl border border-sky-300 bg-sky-50 text-sky-700 shadow-md transition active:scale-95 disabled:opacity-40"
+        >
+          <ArrowLeft size={18} />
+        </button>
+
+        <button
+          type="button"
+          disabled={disabled}
+          aria-label="Stop movement"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            stop();
+          }}
+          className="flex h-12 w-12 items-center justify-center rounded-2xl border border-red-300 bg-red-50 text-red-700 shadow-md transition active:scale-95 disabled:opacity-40"
+        >
+          <Square size={16} />
+        </button>
+
+        <button
+          type="button"
+          disabled={disabled}
+          aria-label="Turn right"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            press("RIGHT");
+          }}
+          onPointerUp={stop}
+          onPointerLeave={stop}
+          onPointerCancel={stop}
+          className="flex h-12 w-12 items-center justify-center rounded-2xl border border-sky-300 bg-sky-50 text-sky-700 shadow-md transition active:scale-95 disabled:opacity-40"
+        >
+          <ArrowRight size={18} />
+        </button>
+
+        <div />
+        <button
+          type="button"
+          disabled={disabled}
+          aria-label="Move backward"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            press("BACKWARD");
+          }}
+          onPointerUp={stop}
+          onPointerLeave={stop}
+          onPointerCancel={stop}
+          className="flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-50 text-emerald-700 shadow-md transition active:scale-95 disabled:opacity-40"
+        >
+          <ArrowDown size={18} />
+        </button>
+        <div />
       </div>
     </div>
   );
@@ -982,12 +926,11 @@ export default function BotPage() {
 
           {/* BOTTOM GAME CONTROLS BAR */}
           <footer className="mobile-control-footer pointer-events-auto flex items-end justify-between gap-2 pb-1">
-            {/* BOTTOM LEFT: DRIVE THROTTLE + HORN BUTTON */}
+            {/* BOTTOM LEFT: SIMPLE DIRECTION PAD + HORN BUTTON */}
             <div className="flex items-end gap-2">
-              <GameDriveJoystick
+              <SimpleMobileMovementPad
                 disabled={controlDisabled}
                 onMove={sendMovement}
-                compact
               />
 
               {/* HORN BUTTON */}
@@ -1098,11 +1041,10 @@ export default function BotPage() {
                 </span>
               </button>
 
-              {/* STEERING JOYSTICK */}
-              <GameSteerJoystick
+              {/* SIMPLE DIRECTION PAD */}
+              <SimpleMobileMovementPad
                 disabled={controlDisabled}
                 onMove={sendMovement}
-                compact
               />
             </div>
           </footer>
@@ -1375,16 +1317,24 @@ export default function BotPage() {
                 </button>
               </div>
 
-              {/* Side-by-Side Joysticks */}
+              {/* Desktop drive controls remain unchanged */}
               <div className="flex items-center justify-around gap-4 bg-slate-50/80 p-4 rounded-2xl border border-slate-100">
-                <GameDriveJoystick
-                  disabled={controlDisabled}
-                  onMove={sendMovement}
-                />
-                <GameSteerJoystick
-                  disabled={controlDisabled}
-                  onMove={sendMovement}
-                />
+                <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 shadow-xs">
+                  <ArrowUp size={14} className="text-emerald-600" />
+                  Forward
+                </div>
+                <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 shadow-xs">
+                  <ArrowDown size={14} className="text-emerald-600" />
+                  Backward
+                </div>
+                <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 shadow-xs">
+                  <ArrowLeft size={14} className="text-sky-600" />
+                  Left
+                </div>
+                <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 shadow-xs">
+                  <ArrowRight size={14} className="text-sky-600" />
+                  Right
+                </div>
               </div>
 
               {/* Quick Action Button Bar */}
