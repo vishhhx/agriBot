@@ -367,6 +367,7 @@ function GameDriveJoystick({
   const handlePointerDown = (e: React.PointerEvent) => {
     if (disabled) return;
     setIsDragging(true);
+    e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
 
     if (!containerRef.current) return;
@@ -382,14 +383,47 @@ function GameDriveJoystick({
     processDrag(e.clientY - rect.top - cy, cy - 25);
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (disabled || !containerRef.current) return;
+    e.preventDefault();
+    setIsDragging(true);
+    const rect = containerRef.current.getBoundingClientRect();
+    const cy = rect.height / 2;
+    const touch = e.touches[0] ?? e.changedTouches[0];
+    processDrag(touch.clientY - rect.top - cy, cy - 25);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || !containerRef.current) return;
+    e.preventDefault();
+    const rect = containerRef.current.getBoundingClientRect();
+    const cy = rect.height / 2;
+    const touch = e.touches[0] ?? e.changedTouches[0];
+    processDrag(touch.clientY - rect.top - cy, cy - 25);
+  };
+
   const handlePointerUp = () => {
     setIsDragging(false);
     setKnobPos({ x: 0, y: 0 });
     stop();
   };
 
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+    setKnobPos({ x: 0, y: 0 });
+    stop();
+  };
+
   return (
-    <div className="flex flex-col items-center gap-1.5 p-2.5 rounded-3xl bg-white/85 border border-slate-200/90 shadow-xl backdrop-blur-xl select-none touch-none">
+    <div
+      className="flex flex-col items-center gap-1.5 p-2.5 rounded-3xl bg-white/85 border border-slate-200/90 shadow-xl backdrop-blur-xl select-none touch-none"
+      style={{
+        touchAction: "none",
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        overscrollBehavior: "contain",
+      }}
+    >
       <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700">
         Drive Throttle
       </span>
@@ -400,6 +434,10 @@ function GameDriveJoystick({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         className={[
           "relative flex items-center justify-center rounded-full border-2 shadow-inner transition-all",
           compact ? "h-24 w-16" : "h-32 w-24",
@@ -407,6 +445,12 @@ function GameDriveJoystick({
             ? "opacity-40 cursor-not-allowed border-slate-200 bg-slate-100"
             : "border-emerald-300/80 bg-gradient-to-b from-emerald-50/80 via-white to-emerald-50/80 cursor-grab active:cursor-grabbing",
         ].join(" ")}
+        style={{
+          touchAction: "none",
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          overscrollBehavior: "contain",
+        }}
       >
         {/* Directional Guide Arrows */}
         <div className="absolute top-2 flex flex-col items-center text-emerald-600">
@@ -497,6 +541,7 @@ function GameSteerJoystick({
   const handlePointerDown = (e: React.PointerEvent) => {
     if (disabled) return;
     setIsDragging(true);
+    e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
 
     if (!containerRef.current) return;
@@ -512,14 +557,47 @@ function GameSteerJoystick({
     processDrag(e.clientX - rect.left - cx, cx - 25);
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (disabled || !containerRef.current) return;
+    e.preventDefault();
+    setIsDragging(true);
+    const rect = containerRef.current.getBoundingClientRect();
+    const cx = rect.width / 2;
+    const touch = e.touches[0] ?? e.changedTouches[0];
+    processDrag(touch.clientX - rect.left - cx, cx - 25);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || !containerRef.current) return;
+    e.preventDefault();
+    const rect = containerRef.current.getBoundingClientRect();
+    const cx = rect.width / 2;
+    const touch = e.touches[0] ?? e.changedTouches[0];
+    processDrag(touch.clientX - rect.left - cx, cx - 25);
+  };
+
   const handlePointerUp = () => {
     setIsDragging(false);
     setKnobPos({ x: 0, y: 0 });
     stop();
   };
 
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+    setKnobPos({ x: 0, y: 0 });
+    stop();
+  };
+
   return (
-    <div className="flex flex-col items-center gap-1.5 p-2.5 rounded-3xl bg-white/85 border border-slate-200/90 shadow-xl backdrop-blur-xl select-none touch-none">
+    <div
+      className="flex flex-col items-center gap-1.5 p-2.5 rounded-3xl bg-white/85 border border-slate-200/90 shadow-xl backdrop-blur-xl select-none touch-none"
+      style={{
+        touchAction: "none",
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        overscrollBehavior: "contain",
+      }}
+    >
       <span className="text-[10px] font-extrabold uppercase tracking-wider text-sky-700">
         Steering Joystick
       </span>
@@ -530,6 +608,10 @@ function GameSteerJoystick({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         className={[
           "relative flex items-center justify-center rounded-full border-2 shadow-inner transition-all",
           compact ? "h-16 w-24" : "h-24 w-32",
@@ -537,6 +619,12 @@ function GameSteerJoystick({
             ? "opacity-40 cursor-not-allowed border-slate-200 bg-slate-100"
             : "border-sky-300/80 bg-gradient-to-r from-sky-50/80 via-white to-sky-50/80 cursor-grab active:cursor-grabbing",
         ].join(" ")}
+        style={{
+          touchAction: "none",
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          overscrollBehavior: "contain",
+        }}
       >
         {/* Directional Guide Arrows */}
         <div className="absolute left-2 flex items-center gap-1 text-sky-600">

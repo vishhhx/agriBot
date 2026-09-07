@@ -3,8 +3,7 @@
 #include <ArduinoJson.h>
 
 #include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include <LiquidCrystal_I2C.h>
 
 // =====================================================
 // WIFI
@@ -85,43 +84,122 @@ bool hornState = false;
 
 
 // =====================================================
-// OLED I2C
+// 16x2 I2C LCD EYES
 // =====================================================
 
-// ESP32 38-pin DevKit/WROOM I2C pins
-#define OLED_SDA 21
-#define OLED_SCL 22
+// ESP32 32-pin DevKit/WROOM I2C pins
+#define LCD_SDA 21
+#define LCD_SCL 22
 
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 64
+#define LCD_ADDRESS 0x27  // Common PCF8574 address; change to 0x3F if needed
+#define LCD_COLUMNS 16
+#define LCD_ROWS 2
 
-#define OLED_RESET -1
-
-
-// =====================================================
-// OLED ADDRESSES
-// =====================================================
-
-#define LEFT_OLED_ADDRESS  0x3C
-#define RIGHT_OLED_ADDRESS 0x3D
-
-
-Adafruit_SSD1306 leftEye(
-    SCREEN_WIDTH,
-    SCREEN_HEIGHT,
-    &Wire,
-    OLED_RESET
+LiquidCrystal_I2C lcd(
+    LCD_ADDRESS,
+    LCD_COLUMNS,
+    LCD_ROWS
 );
 
-Adafruit_SSD1306 rightEye(
-    SCREEN_WIDTH,
-    SCREEN_HEIGHT,
-    &Wire,
-    OLED_RESET
-);
+bool lcdReady = false;
 
-bool oledReady = false;
+// =====================================================
+// CUTE CUSTOM EYE CHARACTERS (no text, pure glyphs)
+// =====================================================
 
+// Big round eye with a little sparkle highlight
+byte eyeOpenL[8] = {
+    B01110,
+    B11111,
+    B11011,
+    B11111,
+    B11111,
+    B01110,
+    B00000,
+    B00000
+};
+
+byte eyeOpenR[8] = {
+    B01110,
+    B11111,
+    B11011,
+    B11111,
+    B11111,
+    B01110,
+    B00000,
+    B00000
+};
+
+// Soft curved closed eye (gentle smile-blink)
+byte eyeClosed[8] = {
+    B00000,
+    B00000,
+    B01110,
+    B10001,
+    B00000,
+    B00000,
+    B00000,
+    B00000
+};
+
+// Squinty happy "^" eye
+byte eyeHappy[8] = {
+    B00000,
+    B10001,
+    B01010,
+    B00100,
+    B00000,
+    B00000,
+    B00000,
+    B00000
+};
+
+// Slanted angry eyes
+byte eyeAngryL[8] = {
+    B10000,
+    B01000,
+    B00100,
+    B00010,
+    B00001,
+    B00000,
+    B00000,
+    B00000
+};
+
+byte eyeAngryR[8] = {
+    B00001,
+    B00010,
+    B00100,
+    B01000,
+    B10000,
+    B00000,
+    B00000,
+    B00000
+};
+
+// Big surprised round eye
+byte eyeWide[8] = {
+    B01110,
+    B10001,
+    B10101,
+    B10101,
+    B10101,
+    B10001,
+    B01110,
+    B00000
+};
+
+// Relaxed sleepy closed eye (low, soft curve)
+byte eyeSleep[8] = {
+    B00000,
+    B00000,
+    B00000,
+    B00000,
+    B00000,
+    B01110,
+    B00000,
+    B00000
+};
 
 // =====================================================
 // EYE STATE
@@ -196,13 +274,6 @@ void hornOff();
 
 void hornBeep(int duration);
 
-void drawSingleEye(
-    Adafruit_SSD1306 &display,
-    int pupilOffsetX,
-    int pupilOffsetY,
-    bool open
-);
-
 void drawEyes();
 
 void eyesCenter();
@@ -216,6 +287,14 @@ void eyesLookUp();
 void eyesLookDown();
 
 void blinkEyes();
+
+void eyesHappy();
+
+void eyesAngry();
+
+void eyesSleep();
+
+void eyesWide();
 
 void updateEyes();
 
@@ -468,248 +547,248 @@ void hornBeep(int duration) {
 
 
 // =====================================================
-// DRAW SINGLE EYE
+// LCD HELPERS
 // =====================================================
 
-void drawSingleEye(
-    Adafruit_SSD1306 &display,
-    int pupilOffsetX,
-    int pupilOffsetY,
-    bool open
+void clearLCDLine(byte row) {
+    lcd.setCursor(0, row);
+    lcd.print("                ");
+}
+
+// Draws two eye glyphs on row 0 and a small symbolic
+// mouth (no words) centered on row 1.
+void drawFace(
+    byte leftChar,
+    byte rightChar,
+    const char* mouthPattern
 ) {
-
-    display.clearDisplay();
-
-
-    // ---------------------------------------------
-    // CLOSED EYE
-    // ---------------------------------------------
-
-    if (!open) {
-
-        display.drawLine(
-            20,
-            32,
-            108,
-            32,
-            SSD1306_WHITE
-        );
-
-        display.drawLine(
-            25,
-            33,
-            103,
-            33,
-            SSD1306_WHITE
-        );
-
-        display.display();
-
+    if (!lcdReady) {
         return;
     }
 
+    lcd.clear();
 
-    // ---------------------------------------------
-    // WHITE EYE
-    // ---------------------------------------------
+    // Eyes on first row
+    lcd.setCursor(3, 0);
+    lcd.write(leftChar);
 
-    display.fillRoundRect(
-        12,
-        6,
-        104,
-        52,
-        22,
-        SSD1306_WHITE
-    );
+    lcd.setCursor(12, 0);
+    lcd.write(rightChar);
 
+    // Symbolic mouth on second row (centered, glyphs only)
+    lcd.setCursor(0, 1);
+    lcd.print("                ");
 
-    // ---------------------------------------------
-    // BLACK INNER AREA
-    // ---------------------------------------------
+    byte len = strlen(mouthPattern);
+    byte startCol = 0;
 
-    display.fillRoundRect(
-        17,
-        10,
-        94,
-        44,
-        18,
-        SSD1306_BLACK
-    );
+    if (len < 16) {
+        startCol = (16 - len) / 2;
+    }
 
-
-    // ---------------------------------------------
-    // PUPIL
-    // ---------------------------------------------
-
-    int pupilX =
-        constrain(
-            64 + pupilOffsetX,
-            35,
-            93
-        );
-
-    int pupilY =
-        constrain(
-            32 + pupilOffsetY,
-            20,
-            44
-        );
-
-
-    display.fillCircle(
-        pupilX,
-        pupilY,
-        17,
-        SSD1306_WHITE
-    );
-
-
-    // Pupil center
-
-    display.fillCircle(
-        pupilX,
-        pupilY,
-        9,
-        SSD1306_BLACK
-    );
-
-
-    display.display();
+    lcd.setCursor(startCol, 1);
+    lcd.print(mouthPattern);
 }
 
 
 // =====================================================
-// DRAW BOTH EYES
-// =====================================================
-
-void drawEyes() {
-
-    if (!oledReady) {
-        return;
-    }
-
-    drawSingleEye(
-        leftEye,
-        eyeX,
-        eyeY,
-        eyesOpen
-    );
-
-    drawSingleEye(
-        rightEye,
-        eyeX,
-        eyeY,
-        eyesOpen
-    );
-}
-
-
-// =====================================================
-// EYES CENTER
+// CENTER EYES
 // =====================================================
 
 void eyesCenter() {
-
     eyeX = 0;
     eyeY = 0;
-
     eyesOpen = true;
 
-    drawEyes();
+    drawFace(0, 1, "\\_____/");
 
     Serial.println("[EYES] CENTER");
 }
 
 
 // =====================================================
-// EYES LEFT
+// LOOK LEFT
 // =====================================================
 
 void eyesLookLeft() {
-
     eyeX = -22;
     eyeY = 0;
-
     eyesOpen = true;
 
-    drawEyes();
+    lcd.clear();
+
+    lcd.setCursor(2, 0);
+    lcd.write(byte(0));
+
+    lcd.setCursor(11, 0);
+    lcd.write(byte(0));
+
+    lcd.setCursor(0, 1);
+    lcd.print("   <<<          ");
 
     Serial.println("[EYES] LEFT");
 }
 
 
 // =====================================================
-// EYES RIGHT
+// LOOK RIGHT
 // =====================================================
 
 void eyesLookRight() {
-
     eyeX = 22;
     eyeY = 0;
-
     eyesOpen = true;
 
-    drawEyes();
+    lcd.clear();
+
+    lcd.setCursor(4, 0);
+    lcd.write(byte(0));
+
+    lcd.setCursor(13, 0);
+    lcd.write(byte(0));
+
+    lcd.setCursor(0, 1);
+    lcd.print("          >>>   ");
 
     Serial.println("[EYES] RIGHT");
 }
 
 
 // =====================================================
-// EYES UP
+// LOOK UP
 // =====================================================
 
 void eyesLookUp() {
-
     eyeX = 0;
     eyeY = -10;
-
     eyesOpen = true;
 
-    drawEyes();
+    drawFace(6, 6, "\\_____/");
 
     Serial.println("[EYES] UP");
 }
 
 
 // =====================================================
-// EYES DOWN
+// LOOK DOWN
 // =====================================================
 
 void eyesLookDown() {
-
     eyeX = 0;
     eyeY = 10;
-
     eyesOpen = true;
 
-    drawEyes();
+    drawFace(7, 7, "\\_____/");
 
     Serial.println("[EYES] DOWN");
 }
 
 
 // =====================================================
-// BLINK EYES
+// BLINK
 // =====================================================
 
 void blinkEyes() {
-
-    if (!oledReady) {
+    if (!lcdReady) {
         return;
     }
 
     eyesOpen = false;
 
-    drawEyes();
+    lcd.clear();
+
+    lcd.setCursor(3, 0);
+    lcd.write(byte(2));
+
+    lcd.setCursor(12, 0);
+    lcd.write(byte(2));
+
+    lcd.setCursor(5, 1);
+    lcd.print("- - -");
 
     delay(120);
 
     eyesOpen = true;
 
-    drawEyes();
+    eyesCenter();
 
     Serial.println("[EYES] BLINK");
+}
+
+
+// =====================================================
+// HAPPY
+// =====================================================
+
+void eyesHappy() {
+    if (!lcdReady) {
+        return;
+    }
+
+    eyeX = 0;
+    eyeY = 0;
+    eyesOpen = true;
+
+    drawFace(3, 3, "\\_______/");
+
+    Serial.println("[EYES] HAPPY");
+}
+
+
+// =====================================================
+// ANGRY
+// =====================================================
+
+void eyesAngry() {
+    if (!lcdReady) {
+        return;
+    }
+
+    eyeX = 0;
+    eyeY = 0;
+    eyesOpen = true;
+
+    drawFace(4, 5, "~~~~~~~");
+
+    Serial.println("[EYES] ANGRY");
+}
+
+
+// =====================================================
+// SLEEP
+// =====================================================
+
+void eyesSleep() {
+    if (!lcdReady) {
+        return;
+    }
+
+    eyeX = 0;
+    eyeY = 0;
+    eyesOpen = false;
+
+    drawFace(7, 7, "  o  ");
+
+    Serial.println("[EYES] SLEEP");
+}
+
+
+// =====================================================
+// SURPRISED / WIDE
+// =====================================================
+
+void eyesWide() {
+    if (!lcdReady) {
+        return;
+    }
+
+    eyeX = 0;
+    eyeY = 0;
+    eyesOpen = true;
+
+    drawFace(6, 6, "  (o)  ");
+
+    Serial.println("[EYES] WIDE");
 }
 
 
@@ -719,10 +798,9 @@ void blinkEyes() {
 
 void updateEyes() {
 
-    if (!oledReady) {
+    if (!lcdReady) {
         return;
     }
-
 
     // ---------------------------------------------
     // AUTO BLINK
@@ -740,7 +818,6 @@ void updateEyes() {
 
         blinkEyes();
     }
-
 
     // ---------------------------------------------
     // AUTO MOVEMENT
@@ -760,10 +837,8 @@ void updateEyes() {
         nextEyeMoveInterval =
             random(1500, 4000);
 
-
         int movement =
             random(0, 5);
-
 
         switch (movement) {
 
@@ -792,79 +867,48 @@ void updateEyes() {
 
 
 // =====================================================
-// OLED SETUP
+// LCD SETUP
 // =====================================================
 
 void setupEyes() {
 
-    Serial.println("[EYES] Initializing OLEDs...");
-
+    Serial.println("[EYES] Initializing 16x2 I2C LCD...");
 
     Wire.begin(
-        OLED_SDA,
-        OLED_SCL
+        LCD_SDA,
+        LCD_SCL
     );
 
+    lcd.init();
+    lcd.backlight();
 
-    // LEFT OLED
+    // Load custom characters.
+    lcd.createChar(0, eyeOpenL);
+    lcd.createChar(1, eyeOpenR);
+    lcd.createChar(2, eyeClosed);
+    lcd.createChar(3, eyeHappy);
+    lcd.createChar(4, eyeAngryL);
+    lcd.createChar(5, eyeAngryR);
+    lcd.createChar(6, eyeWide);
+    lcd.createChar(7, eyeSleep);
 
-    bool leftOk =
-        leftEye.begin(
-            SSD1306_SWITCHCAPVCC,
-            LEFT_OLED_ADDRESS
-        );
-
-
-    // RIGHT OLED
-
-    bool rightOk =
-        rightEye.begin(
-            SSD1306_SWITCHCAPVCC,
-            RIGHT_OLED_ADDRESS
-        );
-
-
-    if (!leftOk) {
-
-        Serial.println(
-            "[EYES] LEFT OLED NOT FOUND"
-        );
-    }
-
-
-    if (!rightOk) {
-
-        Serial.println(
-            "[EYES] RIGHT OLED NOT FOUND"
-        );
-    }
-
-
-    if (!leftOk || !rightOk) {
-
-        oledReady = false;
-
-        Serial.println(
-            "[EYES] OLED SYSTEM DISABLED"
-        );
-
-        return;
-    }
-
-
-    oledReady = true;
-
+    lcdReady = true;
 
     randomSeed(
         esp_random()
     );
 
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("    AGRIBOT");
+    lcd.setCursor(0, 1);
+    lcd.print("   STARTING...");
+    delay(1000);
 
     eyesCenter();
 
-
     Serial.println(
-        "[EYES] BOTH OLEDs READY"
+        "[EYES] 16x2 LCD READY"
     );
 }
 
@@ -1031,7 +1075,7 @@ void sendTelemetry() {
         hornState;
 
     payload["eyes"] =
-        oledReady;
+        lcdReady;
 
     payload["eyeX"] =
         eyeX;
@@ -1338,6 +1382,62 @@ void handleCommand(
         Serial.println(
             "[EYES] MANUAL MODE"
         );
+    }
+
+
+    // =================================================
+    // EXTRA LCD EXPRESSIONS
+    // =================================================
+
+    else if (
+        strcmp(
+            command,
+            "eyes_happy"
+        ) == 0
+    ) {
+
+        autoEyes = false;
+
+        eyesHappy();
+    }
+
+
+    else if (
+        strcmp(
+            command,
+            "eyes_angry"
+        ) == 0
+    ) {
+
+        autoEyes = false;
+
+        eyesAngry();
+    }
+
+
+    else if (
+        strcmp(
+            command,
+            "eyes_sleep"
+        ) == 0
+    ) {
+
+        autoEyes = false;
+
+        eyesSleep();
+    }
+
+
+    else if (
+        strcmp(
+            command,
+            "eyes_wide"
+        ) == 0
+    ) {
+
+        autoEyes = false;
+
+        eyesWide();
     }
 
 
